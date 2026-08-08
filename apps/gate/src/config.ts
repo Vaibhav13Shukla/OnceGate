@@ -27,6 +27,6 @@ export function loadConfig(env = process.env): Config {
     requireKey: boolean(env.REQUIRE_KEY),
     adminToken: env.ADMIN_TOKEN ?? '',
     responseBodyMaxBytes: number(env.RESPONSE_BODY_MAX_BYTES, 262_144),
-    corsOrigin: env.CORS_ORIGIN ?? false
+    corsOrigin: env.CORS_ORIGIN ?? '*'
   };
 }
