@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-const gateUrl = import.meta.env.VITE_GATE_URL || 'http://localhost:4000';
+const gateUrl = import.meta.env.VITE_GATE_URL ?? '';
 const adminHeaders = (token: string): Record<string, string> => token ? { authorization: `Bearer ${token}` } : {};
 
 export type Receipt = { id: string; idempotency_key: string; status: 'PENDING'|'COMMITTED'|'FAILED'|'UNKNOWN'; attempt_count: number; created_at: string; resolution_note?: string };
