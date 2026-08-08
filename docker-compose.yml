@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oncegate
+      POSTGRES_PASSWORD: oncegate
+      POSTGRES_DB: oncegate_test
+    ports:
+      - "54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oncegate -d oncegate_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
