@@ -143,7 +143,7 @@ export default function App() {
           <div className="container">
             <div className="eyebrow-badge">
               <span className="status-dot-live" />
-              <span>Zerops Challenge · Durable Idempotency Gateway</span>
+              <span>Enterprise Gateway · Durable Idempotency Engine</span>
             </div>
             <h1 style={{ fontSize: 'clamp(2.5rem, 4.5vw, 3.8rem)', fontWeight: 600, lineHeight: 1.15, marginBottom: 16 }}>
               Durable HTTP Idempotency Gateway
@@ -393,7 +393,7 @@ export default function App() {
             </div>
 
             <div className="footer-bottom">
-              <div>© 2026 OnceGate · Zerops Challenge Entry</div>
+              <div>© 2026 OnceGate · Durable Idempotency Platform</div>
               <div><a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07" target="_blank" rel="noreferrer">IETF Draft Spec ↗</a></div>
             </div>
           </div>
