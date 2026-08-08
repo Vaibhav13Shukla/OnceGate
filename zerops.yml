@@ -38,6 +38,10 @@ zerops:
         - port: 3100
           httpSupport: true
       start: node apps/checkout/dist/server.js
+      healthCheck:
+        httpGet:
+          port: 3100
+          path: /healthz
   - setup: console
     build:
       base: nodejs@22
