@@ -1,5 +1,33 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 dist/
+build/
+.output/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Environment
 .env
 .env.*
+!.env.example
+
+# Testing & Coverage
 coverage/
+.vitest/
+
+# Internal docs & scratch files
+docs/
+scratch/
+*.tmp
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
