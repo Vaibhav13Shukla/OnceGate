@@ -27,7 +27,7 @@ CREATE INDEX idx_receipts_created ON receipts(created_at DESC);
 
 CREATE TABLE events (
   id bigserial PRIMARY KEY,
-  receipt_id uuid NOT NULL REFERENCES receipts(id),
+  receipt_id uuid NOT NULL REFERENCES receipts(id) ON DELETE CASCADE,
   kind text NOT NULL,
   detail jsonb,
   created_at timestamptz NOT NULL DEFAULT now()

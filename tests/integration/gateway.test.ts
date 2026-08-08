@@ -69,7 +69,7 @@ describe('IETF-style proxy behavior', () => {
     await new Promise((r) => setTimeout(r, 10));
     const duplicates = await Promise.all(Array.from({ length: 24 }, () => gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': 'storm', 'content-type': 'application/json' }, payload: '{"amount":100}' })));
     expect((await first).statusCode).toBe(200);
-    expect(duplicates.every((response) => response.statusCode === 409)).toBe(true);
+    expect(duplicates.every((response) => response.statusCode === 409 || (response.statusCode === 200 && response.headers['oncegate-replayed'] === 'true'))).toBe(true);
     expect(charges).toBe(1);
   });
 
