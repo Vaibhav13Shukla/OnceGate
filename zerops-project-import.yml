@@ -1,0 +1,19 @@
+project:
+  name: oncegate
+  description: Durable Idempotency-Key gateway
+  corePackage: LIGHT
+services:
+  - hostname: gate
+    type: nodejs@22
+    mode: NON_HA
+    enableSubdomainAccess: true
+  - hostname: checkout
+    type: nodejs@22
+    mode: NON_HA
+  - hostname: console
+    type: static
+    mode: NON_HA
+    enableSubdomainAccess: true
+  - hostname: db
+    type: postgresql@16
+    mode: NON_HA
