@@ -6,6 +6,9 @@ services:
   - hostname: db
     type: postgresql@16
     mode: NON_HA
+  - hostname: cache
+    type: valkey@8
+    mode: NON_HA
   - hostname: checkout
     type: nodejs@22
     mode: NON_HA
@@ -18,6 +21,7 @@ services:
     enableSubdomainAccess: true
     envSecrets:
       DATABASE_URL: 'postgres://${db_user}:${db_password}@db:5432/${db_name}'
+      VALKEY_URL: 'redis://cache:6379'
       UPSTREAM_BASE_URL: 'http://checkout:3100'
       ADMIN_TOKEN: 'admin-secret'
       CORS_ORIGIN: '*'
