@@ -39,6 +39,11 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // In-App Resolution Modal State
+  const [resolveTarget, setResolveTarget] = useState<'COMMITTED' | 'FAILED' | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [resolving, setResolving] = useState(false);
+
   const tokenRef = useRef(token);
   tokenRef.current = token;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -104,17 +109,24 @@ export default function App() {
     }
   };
 
-  const resolve = async (status: 'COMMITTED' | 'FAILED') => {
-    if (!detail) return;
-    const note = window.prompt('Enter audit resolution note:');
-    if (!note) return;
+  const confirmResolve = async () => {
+    if (!detail || !resolveTarget) return;
+    if (!resolutionNote.trim()) {
+      showToast('Resolution audit note is required');
+      return;
+    }
+    setResolving(true);
     try {
-      await api.resolve(detail.id, status, note, token);
-      showToast(`Receipt ${detail.id.slice(0, 8)} resolved to ${status}`);
+      await api.resolve(detail.id, resolveTarget, resolutionNote.trim(), token);
+      showToast(`Receipt ${detail.id.slice(0, 8)} resolved to ${resolveTarget}`);
+      setResolveTarget(null);
+      setResolutionNote('');
       await refresh();
       await inspect(detail);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Resolution failed');
+    } finally {
+      setResolving(false);
     }
   };
 
@@ -303,7 +315,7 @@ export default function App() {
 
       {/* Drawer Overlay for Receipt Inspection */}
       {selected && (
-        <div className="drawer-overlay" onClick={() => { setSelected(undefined); setDetail(undefined); }} />
+        <div className="drawer-overlay" onClick={() => { setSelected(undefined); setDetail(undefined); setResolveTarget(null); }} />
       )}
 
       {selected && (
@@ -318,7 +330,7 @@ export default function App() {
                 ID: {selected.id}
               </p>
             </div>
-            <button className="close-btn" onClick={() => { setSelected(undefined); setDetail(undefined); }}>
+            <button className="close-btn" onClick={() => { setSelected(undefined); setDetail(undefined); setResolveTarget(null); }}>
               ×
             </button>
           </div>
@@ -356,10 +368,10 @@ export default function App() {
                     Verify upstream database status, then record audit resolution:
                   </p>
                   <div style={{ display: 'flex', gap: 10 }}>
-                    <button className="btn btn-lime" style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }} onClick={() => void resolve('COMMITTED')}>
+                    <button className="btn btn-lime" style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }} onClick={() => setResolveTarget('COMMITTED')}>
                       Mark COMMITTED
                     </button>
-                    <button className="btn btn-danger" style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }} onClick={() => void resolve('FAILED')}>
+                    <button className="btn btn-danger" style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }} onClick={() => setResolveTarget('FAILED')}>
                       Mark FAILED
                     </button>
                   </div>
@@ -368,6 +380,43 @@ export default function App() {
             </>
           )}
         </aside>
+      )}
+
+      {/* Custom In-App Modal for UNKNOWN Resolution */}
+      {resolveTarget && (
+        <div className="drawer-overlay" style={{ zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ backgroundColor: '#FFF', borderRadius: '16px', padding: '28px', maxWidth: '460px', width: '90%', border: '2px solid #191A23', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8, color: '#191A23' }}>
+              Confirm Audit Resolution → <span style={{ color: resolveTarget === 'COMMITTED' ? '#2E7D32' : '#C62828' }}>{resolveTarget}</span>
+            </h3>
+            <p style={{ fontSize: '0.88rem', color: '#555', marginBottom: 16 }}>
+              Provide a mandatory audit note documenting why this receipt is being marked as {resolveTarget}:
+            </p>
+            <textarea
+              value={resolutionNote}
+              onChange={(e) => setResolutionNote(e.target.value)}
+              placeholder="e.g. Verified transaction #8821 in upstream PostgreSQL database logs."
+              rows={3}
+              style={{ width: '100%', padding: '10px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid #191A23', fontFamily: 'sans-serif', marginBottom: 18 }}
+            />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => { setResolveTarget(null); setResolutionNote(''); }}
+                disabled={resolving}
+              >
+                Cancel
+              </button>
+              <button
+                className={`btn ${resolveTarget === 'COMMITTED' ? 'btn-lime' : 'btn-danger'}`}
+                onClick={() => void confirmResolve()}
+                disabled={resolving}
+              >
+                {resolving ? 'Recording...' : 'Submit Resolution'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Footer */}

@@ -6,8 +6,17 @@ import { problem } from './problem.js';
 import { addEvent, claimOrLoad, type Receipt, settle } from './receipts.js';
 
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
-const tenant = 'default';
-const responseHeaderAllowlist = new Set(['content-type', 'content-language', 'location', 'cache-control']);
+const responseHeaderAllowlist = new Set([
+  'content-type',
+  'content-language',
+  'location',
+  'cache-control',
+  'etag',
+  'x-request-id',
+  'stripe-version',
+  'x-correlation-id',
+  'last-modified'
+]);
 
 function pathFromRequest(request: FastifyRequest): string {
   return request.url.replace(/^\/p(?=\/|$)/, '').split('?')[0] || '/';
@@ -16,14 +25,19 @@ function pathFromRequest(request: FastifyRequest): string {
 function requestHeaders(request: FastifyRequest): Headers {
   const headers = new Headers();
   for (const [name, value] of Object.entries(request.headers)) {
-    if (value !== undefined && !['host', 'content-length'].includes(name.toLowerCase())) headers.set(name, Array.isArray(value) ? value.join(', ') : value);
+    const lower = name.toLowerCase();
+    if (value !== undefined && !['host', 'content-length', 'authorization', 'cookie', 'set-cookie'].includes(lower)) {
+      headers.set(name, Array.isArray(value) ? value.join(', ') : value);
+    }
   }
   return headers;
 }
 
 function storedHeaders(response: Response): Record<string, string> {
   const headers: Record<string, string> = {};
-  response.headers.forEach((value, name) => { if (responseHeaderAllowlist.has(name)) headers[name] = value; });
+  response.headers.forEach((value, name) => {
+    if (responseHeaderAllowlist.has(name.toLowerCase())) headers[name] = value;
+  });
   return headers;
 }
 
@@ -52,6 +66,8 @@ export function proxyHandler(db: Database, config: Config) {
     const path = pathFromRequest(request);
     const url = `${config.upstreamBaseUrl}${path}${request.url.includes('?') ? `?${request.url.split('?')[1]}` : ''}`;
     const body = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
+    const tenantHeader = request.headers['x-tenant-id'];
+    const tenant = typeof tenantHeader === 'string' && tenantHeader.trim() ? tenantHeader.trim() : 'default';
 
     if (safeMethods.has(request.method)) {
       try {

@@ -1,5 +1,6 @@
 export interface Config {
   databaseUrl: string;
+  valkeyUrl?: string;
   upstreamBaseUrl: string;
   upstreamTimeoutMs: number;
   keyTtlHours: number;
@@ -21,6 +22,7 @@ export function loadConfig(env = process.env): Config {
   if (!env.UPSTREAM_BASE_URL) throw new Error('UPSTREAM_BASE_URL is required');
   return {
     databaseUrl: env.DATABASE_URL,
+    valkeyUrl: env.VALKEY_URL,
     upstreamBaseUrl: env.UPSTREAM_BASE_URL.replace(/\/$/, ''),
     upstreamTimeoutMs: number(env.UPSTREAM_TIMEOUT_MS, 10_000),
     keyTtlHours: number(env.KEY_TTL_HOURS, 24),
