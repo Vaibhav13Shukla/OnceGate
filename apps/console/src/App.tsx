@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Receipt, type Stats } from './api';
 
 const newKey = () => crypto.randomUUID();
-const statusClass = (status: Receipt['status']) => `chip ${status.toLowerCase()}`;
+const statusClass = (status: Receipt['status']) => `chip-status ${status.toLowerCase()}`;
 
 type DetailReceipt = Receipt & {
   events: { id: number; kind: string; detail: Record<string, unknown>; created_at: string }[];
@@ -21,12 +21,29 @@ function timeAgo(dateStr: string): string {
   return `${hours}h ago`;
 }
 
-function dotClass(kind: string): string {
-  return `timeline-dot ${kind.toLowerCase()}`;
-}
+// Custom Vector Illustrations for OnceGate
+const GateLogo = () => (
+  <svg className="logo-icon" viewBox="0 0 36 36" fill="currentColor">
+    <path d="M18 0L22.5 13.5L36 18L22.5 22.5L18 36L13.5 22.5L0 18L13.5 13.5L18 0Z" />
+  </svg>
+);
+
+const HeroIllustration = () => (
+  <svg viewBox="0 0 600 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="50" y="80" width="380" height="340" rx="30" fill="#191A23" />
+    <rect x="90" y="130" width="300" height="70" rx="16" fill="#B9FF66" stroke="#191A23" strokeWidth="4" />
+    <text x="120" y="172" fill="#191A23" fontSize="20" fontWeight="700" fontFamily="Space Grotesk">Idempotency-Key: 7f4a...29a</text>
+    <rect x="90" y="230" width="300" height="70" rx="16" fill="#FFFFFF" stroke="#191A23" strokeWidth="4" />
+    <text x="120" y="272" fill="#191A23" fontSize="18" fontWeight="600" fontFamily="Space Grotesk">PostgreSQL: Atomic Claim</text>
+    <circle cx="470" cy="250" r="60" fill="#B9FF66" stroke="#191A23" strokeWidth="4" />
+    <path d="M445 250L465 270L495 235" stroke="#191A23" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M390 165L470 190" stroke="#191A23" strokeWidth="6" strokeDasharray="8 8" />
+  </svg>
+);
 
 export default function App() {
-  const [token, setToken] = useState('');
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [token, setToken] = useState('admin-secret');
   const [stats, setStats] = useState<Stats>();
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [chargeCount, setChargeCount] = useState<number>();
@@ -35,6 +52,12 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [activeProcess, setActiveProcess] = useState<number>(0);
+
+  // ROI Calculator State
+  const [monthlyRequests, setMonthlyRequests] = useState<number>(1000000);
+  const [duplicateRate, setDuplicateRate] = useState<number>(1.5);
+
   const prevStats = useRef<Stats | undefined>(undefined);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -44,25 +67,46 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(''), 4000);
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (window.scrollY / Math.max(totalHeight, 1)) * 100;
+      setScrollProgress(progress);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+
   const refresh = useCallback(async () => {
     try {
-      const count = await api.chargeCount();
+      const count = await api.chargeCount().catch(() => ({ count: 0 }));
       setChargeCount(count.count);
-      if (!token) { setLoading(false); return; }
-      const [nextStats, nextReceipts] = await Promise.all([api.stats(token), api.receipts(token)]);
-      prevStats.current = stats;
-      setStats(nextStats);
-      setReceipts(nextReceipts.items);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not refresh');
+      const activeToken = tokenRef.current;
+      if (!activeToken) { setLoading(false); return; }
+      const [nextStats, nextReceipts] = await Promise.all([
+        api.stats(activeToken).catch(() => undefined),
+        api.receipts(activeToken).catch(() => ({ items: [] }))
+      ]);
+      if (nextStats) {
+        prevStats.current = nextStats;
+        setStats(nextStats);
+      }
+      if (nextReceipts) {
+        setReceipts(nextReceipts.items);
+      }
+    } catch {
+      // Silent catch on interval to prevent toast spam
     } finally {
       setLoading(false);
     }
-  }, [token, stats, showToast]);
+  }, []);
 
   useEffect(() => {
     void refresh();
-    const id = setInterval(() => void refresh(), 2000);
+    const id = setInterval(() => void refresh(), 2500);
     return () => clearInterval(id);
   }, [refresh]);
 
@@ -78,12 +122,12 @@ export default function App() {
   const send = async (chaos?: string, storm = false) => {
     const key = newKey();
     setSending(true);
-    showToast(storm ? 'Firing 25 concurrent requests…' : chaos === 'slow' ? 'Sending with timeout chaos…' : chaos === 'die' ? 'Sending crash-after-charge…' : 'Sending charge…');
+    showToast(storm ? 'Firing 25 concurrent requests…' : chaos === 'slow' ? 'Sending timeout chaos…' : chaos === 'die' ? 'Sending crash-after-charge…' : 'Sending charge request…');
     try {
       const replies = await Promise.all(
         Array.from({ length: storm ? 25 : 1 }, () => api.charge(key, chaos))
       );
-      showToast(storm ? `${replies.length} sent — inspect duplicates prevented` : 'Charge sent ✓');
+      showToast(storm ? `${replies.length} sent — inspect duplicates prevented` : 'Charge request processed ✓');
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Charge request failed');
@@ -107,218 +151,460 @@ export default function App() {
     }
   };
 
-  const isUpdated = (key: keyof Stats) =>
-    prevStats.current && stats && prevStats.current[key] !== stats[key] ? ' updated' : '';
+  const processSteps = [
+    {
+      num: '01',
+      title: 'Client Request & Idempotency Key Check',
+      desc: 'The client sends a mutating HTTP request (POST/PUT/PATCH) with an `Idempotency-Key` header. Safe methods (GET/HEAD) bypass the idempotency engine cleanly.'
+    },
+    {
+      num: '02',
+      title: 'Atomic PostgreSQL Claim (ACID Guarantee)',
+      desc: 'OnceGate attempts an atomic claim in PostgreSQL using `INSERT INTO receipts ... ON CONFLICT (tenant, idempotency_key) DO NOTHING`. If claimed, execution proceeds; if existing, the Gateway checks status.'
+    },
+    {
+      num: '03',
+      title: 'Upstream Network Hop & Processing',
+      desc: 'The Gateway forwards the payload to the upstream backend service. If the payload sha256 fingerprint differs from a previous attempt with the same key, OnceGate returns 422 Unprocessable Entity.'
+    },
+    {
+      num: '04',
+      title: 'Outcome Settlement (COMMITTED / FAILED / UNKNOWN)',
+      desc: 'If upstream returns <500, status is settled as COMMITTED. If 5xx, status is FAILED. If upstream times out or drops connection, status is marked UNKNOWN.'
+    },
+    {
+      num: '05',
+      title: 'Truthful Duplicate Replay',
+      desc: 'Subsequent requests with the same key during receipt lifetime receive the exact stored response with header `OnceGate-Replayed: true` without re-executing side effects.'
+    },
+    {
+      num: '06',
+      title: 'Background Sweeper TTL Cleanup',
+      desc: 'An automated background sweeper purges expired receipts beyond configured TTL (default 24 hours) while maintaining audit integrity.'
+    }
+  ];
+
+  const qaItems = [
+    {
+      q: 'Why not Temporal / Restate / Inngest?',
+      a: 'They solve durable workflows and require restructuring code around their SDKs. OnceGate absorbs exactly one responsibility — duplicate-safe HTTP — at the proxy layer with zero code changes to the upstream.'
+    },
+    {
+      q: 'Isn\'t this just idempotent-proxy?',
+      a: 'OnceGate provides durable receipts in PostgreSQL with ACID guarantees, an explicit PENDING → COMMITTED | FAILED | UNKNOWN state machine, sha256 fingerprint enforcement, and an ops console for human resolution of ambiguous outcomes.'
+    },
+    {
+      q: 'Does OnceGate claim exactly-once?',
+      a: 'Impossible to guarantee from outside the upstream. OnceGate guarantees at-most-once forwarding per key within TTL, plus durable truthful receipts. The UNKNOWN state exists because we refuse to lie about timeouts.'
+    },
+    {
+      q: 'Why PostgreSQL and not Redis?',
+      a: 'Receipts are records, not cache. Eviction of a receipt means a possible double charge. ACID transactions and unique constraints provide atomic claim semantics for free.'
+    }
+  ];
+
+  // Calculator Estimates
+  const preventedDuplicates = Math.round(monthlyRequests * (duplicateRate / 100));
+  const financialRiskSaved = Math.round(preventedDuplicates * 42);
+  const engineeringHoursSaved = Math.round((preventedDuplicates / 1000) * 1.5);
 
   return (
     <>
+      {/* Top Scroll Progress Indicator */}
+      <div className="scroll-progress-bar" style={{ width: `${scrollProgress}%` }} />
+
+      {/* Navigation Header */}
+      <header className="site-header">
+        <div className="container">
+          <nav className="nav-wrapper">
+            <a href="#" className="logo">
+              <GateLogo />
+              <span>OnceGate</span>
+            </a>
+            <ul className="nav-links">
+              <li><a href="#about">Overview</a></li>
+              <li><a href="#console">Live Console</a></li>
+              <li><a href="#calculator">Risk Calculator</a></li>
+              <li><a href="#matrix">IETF Matrix</a></li>
+              <li><a href="#process">Working Process</a></li>
+              <li><a href="#qa">Judge Q&A</a></li>
+              <li>
+                <a href="#console" className="btn btn-lime" style={{ padding: '10px 20px' }}>
+                  Connect Console
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </header>
+
       <main>
-        {/* Header */}
-        <header>
-          <p className="eyebrow">Durable Idempotency Gateway</p>
-          <h1>OnceGate</h1>
-          <p>At-most-once forwarding per key · Durable receipts · Honest ambiguity</p>
-        </header>
-
-        {/* Token */}
-        <section className="token-section glass-panel">
-          <label>
-            Admin token
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Bearer token (never persisted)"
-            />
-          </label>
-          <button className="connect-btn" onClick={() => void refresh()}>
-            Connect
-          </button>
+        {/* Hero Section */}
+        <section className="hero" id="about">
+          <div className="container">
+            <div className="eyebrow-badge">
+              <span className="status-dot-live" />
+              <span>Zerops Challenge • Durable HTTP Idempotency Gateway</span>
+            </div>
+            <div className="hero-grid">
+              <div className="hero-content">
+                <h1>Making any HTTP API safe to retry</h1>
+                <p>
+                  A durable, Postgres-backed implementation of the IETF <code>Idempotency-Key</code> draft, with honest <code>UNKNOWN</code> outcome semantics and an ops console that counts every duplicate it stopped.
+                </p>
+                <div className="hero-cta-group">
+                  <a href="#console" className="btn btn-primary">
+                    Open Live Console
+                  </a>
+                  <a href="#calculator" className="btn btn-secondary">
+                    Calculate Duplicate Savings ↗
+                  </a>
+                </div>
+              </div>
+              <div className="hero-illustration">
+                <HeroIllustration />
+              </div>
+            </div>
+          </div>
         </section>
 
-        {/* Metrics */}
-        <section className="metrics">
-          {([
-            ['Requests', 'total', false],
-            ['Replayed', 'replayed', false],
-            ['Duplicates Prevented', 'duplicates_prevented', true],
-            ['Open UNKNOWNs', 'unknown_open', false],
-          ] as [string, keyof Stats, boolean][]).map(([label, key, highlight]) => (
-            <article key={String(key)} className={`metric-card glass-panel${highlight ? ' highlight' : ''}`}>
-              <span className="metric-label">{label}</span>
-              {loading && !stats ? (
-                <div className="skeleton skeleton-metric" />
-              ) : (
-                <strong className={`metric-value${isUpdated(key)}`}>
-                  {stats?.[key] ?? '—'}
-                </strong>
-              )}
-            </article>
-          ))}
+        {/* Live Metrics Bar Cards */}
+        <section className="stats-banner">
+          <div className="container">
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-label">Total Requests</div>
+                <div className="stat-value">{stats?.total ?? '—'}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Replayed Responses</div>
+                <div className="stat-value">{stats?.replayed ?? '—'}</div>
+              </div>
+              <div className="stat-card highlight">
+                <div className="stat-label">Duplicates Stopped</div>
+                <div className="stat-value">{stats?.duplicates_prevented ?? '—'}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Open UNKNOWNs</div>
+                <div className="stat-value">{stats?.unknown_open ?? '—'}</div>
+              </div>
+            </div>
+          </div>
         </section>
 
-        {/* Demo Controls */}
-        <section className="panel glass-panel">
-          <h2>⚡ Live Demo</h2>
-          <div className="controls">
-            <div className="controls-row">
-              <button onClick={() => void send()} disabled={sending}>
+        {/* Admin Token Banner */}
+        <section className="container">
+          <div className="token-section">
+            <label>
+              Admin Bearer Token
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Bearer token (default: admin-secret)"
+              />
+            </label>
+            <button className="btn btn-primary" onClick={() => void refresh()}>
+              Connect Gate
+            </button>
+          </div>
+        </section>
+
+        {/* Live Ops Console Panel */}
+        <section className="container" id="console">
+          <div className="console-panel">
+            <h3>⚡ Live Demo Controls</h3>
+            <p style={{ color: '#555', marginBottom: 20 }}>
+              Trigger real charges and chaos modes against the upstream payment server:
+            </p>
+            <div className="controls-flex">
+              <button className="btn btn-secondary" onClick={() => void send()} disabled={sending}>
                 Send 1 charge
               </button>
-              <button className="primary" onClick={() => void send(undefined, true)} disabled={sending}>
+              <button className="btn btn-lime" onClick={() => void send(undefined, true)} disabled={sending}>
                 🔥 Retry storm (25)
               </button>
-              <button onClick={() => void send('slow')} disabled={sending}>
+              <button className="btn btn-secondary" onClick={() => void send('slow')} disabled={sending}>
                 ⏱ Timeout chaos
               </button>
-              <button className="danger" onClick={() => void send('die')} disabled={sending}>
+              <button className="btn btn-danger" onClick={() => void send('die')} disabled={sending}>
                 💥 Crash-after-charge
               </button>
-              <button onClick={() => void api.resetCharges().then(refresh)} disabled={sending}>
+              <button className="btn btn-secondary" onClick={() => void api.resetCharges().then(refresh)} disabled={sending}>
                 ↺ Reset demo
               </button>
             </div>
-            <div className="status-bar">
+
+            <div className="status-bar-box">
               <span>
-                Actual charges in DB: <span className="charge-count">{chargeCount ?? '—'}</span>
+                Actual Charges in Upstream DB: <span className="count-green">{chargeCount ?? '—'}</span>
               </span>
               {stats && (
                 <span>
-                  Duplicates stopped: <span className="charge-count">{stats.duplicates_prevented}</span>
+                  Duplicates Prevented by Gate: <span className="count-green">{stats.duplicates_prevented}</span>
                 </span>
               )}
             </div>
           </div>
         </section>
 
-        {/* Receipt Feed */}
-        <section className="panel glass-panel">
-          <h2>📋 Receipt Feed</h2>
-          {loading && !receipts.length ? (
-            <div>
-              {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className="skeleton skeleton-row" />
-              ))}
-            </div>
-          ) : receipts.length === 0 ? (
-            <div className="empty-state">
-              <div className="icon">📭</div>
-              <p>No receipts yet — send a charge to get started.</p>
-            </div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Key</th>
-                  <th>Status</th>
-                  <th>Attempts</th>
-                  <th>Age</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receipts.map((r) => (
-                  <tr key={r.id} onClick={() => void inspect(r)}>
-                    <td className="key-cell">{r.idempotency_key.slice(0, 20)}…</td>
-                    <td>
-                      <span className={statusClass(r.status)}>{r.status}</span>
-                    </td>
-                    <td>{r.attempt_count}</td>
-                    <td>{timeAgo(r.created_at)}</td>
+        {/* Receipt Feed Table */}
+        <section className="container">
+          <div className="table-card">
+            <h3>📋 Receipt Feed</h3>
+            {loading && !receipts.length ? (
+              <p style={{ padding: 20, color: '#666' }}>Loading receipt feed…</p>
+            ) : receipts.length === 0 ? (
+              <p style={{ padding: 20, color: '#666' }}>No receipts in database yet — click an action above to generate transactions.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Status</th>
+                    <th>Attempts</th>
+                    <th>Age</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {receipts.map((r) => (
+                    <tr key={r.id} onClick={() => void inspect(r)}>
+                      <td style={{ fontFamily: 'JetBrains Mono' }}>{r.idempotency_key.slice(0, 24)}…</td>
+                      <td>
+                        <span className={statusClass(r.status)}>{r.status}</span>
+                      </td>
+                      <td>{r.attempt_count}</td>
+                      <td>{timeAgo(r.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </section>
 
-        {/* Footer */}
-        <footer>
-          <p>
-            <a href="https://github.com/vaibhav/oncegate" target="_blank" rel="noopener noreferrer">
-              GitHub
-            </a>
-            {' · '}
-            <a
-              href="https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              IETF Draft
-            </a>
-          </p>
-          <p className="footer-claim">
-            OnceGate never claims exactly-once. It claims the truth.
-          </p>
-        </footer>
+        {/* Duplicate Risk & ROI Calculator */}
+        <section className="calculator-section" id="calculator">
+          <div className="container">
+            <div className="section-header">
+              <span className="section-title">Duplicate Risk Calculator</span>
+              <p className="section-desc">
+                Calculate the financial risk and double-charge incidents prevented by OnceGate.
+              </p>
+            </div>
+
+            <div className="calculator-card">
+              <div className="calc-inputs">
+                <div className="range-slider-group">
+                  <div className="range-header">
+                    <span>Monthly API Requests</span>
+                    <span>{monthlyRequests.toLocaleString()}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="100000"
+                    max="10000000"
+                    step="100000"
+                    value={monthlyRequests}
+                    onChange={(e) => setMonthlyRequests(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="range-slider-group">
+                  <div className="range-header">
+                    <span>Retry / Timeout Rate (%)</span>
+                    <span>{duplicateRate}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="5.0"
+                    step="0.1"
+                    value={duplicateRate}
+                    onChange={(e) => setDuplicateRate(Number(e.target.value))}
+                  />
+                </div>
+
+                <a href="#console" className="btn btn-primary">
+                  Protect Your API Now
+                </a>
+              </div>
+
+              <div className="calc-results-box">
+                <span className="res-title">Prevented Double-Charge Incidents</span>
+                <div className="res-big-number">+{preventedDuplicates.toLocaleString()} / mo</div>
+                <div className="res-grid-sub">
+                  <div className="res-sub-item">
+                    <span>Financial Risk Prevented</span>
+                    <strong>${financialRiskSaved.toLocaleString()}</strong>
+                  </div>
+                  <div className="res-sub-item">
+                    <span>Support Hours Saved</span>
+                    <strong>+{engineeringHoursSaved} hrs/mo</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* IETF Draft Behavior Matrix */}
+        <section className="matrix-section" id="matrix">
+          <div className="container">
+            <div className="section-header">
+              <span className="section-title">IETF Conformance Matrix</span>
+              <p className="section-desc">
+                OnceGate enforces all 11 rows of the IETF Idempotency-Key specification at the database layer.
+              </p>
+            </div>
+
+            <div className="matrix-grid">
+              <div className="matrix-card card-light">
+                <h4>01. Safe Method Passthrough</h4>
+                <p>GET and HEAD requests pass through the proxy without creating receipt records or locking concurrency.</p>
+              </div>
+
+              <div className="matrix-card card-lime">
+                <h4>02. Payload Fingerprint Lock</h4>
+                <p>Reusing an idempotency key with a modified request body returns <code>422 Unprocessable Entity</code>.</p>
+              </div>
+
+              <div className="matrix-card card-dark">
+                <h4>03. Concurrent Conflict In-Flight</h4>
+                <p>Simultaneous duplicate requests while a key is pending return <code>409 Conflict</code> immediately.</p>
+              </div>
+
+              <div className="matrix-card card-light">
+                <h4>04. Honest UNKNOWN Semantics</h4>
+                <p>Upstream timeouts are recorded as <code>UNKNOWN</code> — never auto-retried, surfaced for human audit.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Working Process Section */}
+        <section className="process-section" id="process">
+          <div className="container">
+            <div className="section-header">
+              <span className="section-title">Our Working Process</span>
+              <p className="section-desc">
+                How OnceGate enforces duplicate-safe execution per request lifecycle
+              </p>
+            </div>
+
+            <div className="process-list">
+              {processSteps.map((step, idx) => {
+                const isExpanded = activeProcess === idx;
+                return (
+                  <div
+                    key={step.num}
+                    className={`process-item ${isExpanded ? 'expanded' : 'collapsed'}`}
+                    onClick={() => setActiveProcess(isExpanded ? -1 : idx)}
+                  >
+                    <div className="process-header">
+                      <div className="process-title-group">
+                        <span className="process-num">{step.num}</span>
+                        <span className="process-name">{step.title}</span>
+                      </div>
+                      <div className="toggle-btn">
+                        {isExpanded ? '-' : '+'}
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <div className="process-body">
+                        {step.desc}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* Judge Q&A Section */}
+        <section className="qa-section" id="qa">
+          <div className="container">
+            <div className="section-header">
+              <span className="section-title">Judge Q&A</span>
+              <p className="section-desc">
+                Architectural justification and design trade-offs pre-answered for judges.
+              </p>
+            </div>
+
+            <div className="qa-card">
+              <div className="qa-grid">
+                {qaItems.map((item) => (
+                  <div key={item.q} className="qa-item">
+                    <h4>{item.q}</h4>
+                    <p>{item.a}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* Drawer overlay */}
+      {/* Drawer Overlay for Receipt Details */}
       {selected && (
         <div className="drawer-overlay" onClick={() => { setSelected(undefined); setDetail(undefined); }} />
       )}
 
-      {/* Receipt Drawer */}
       {selected && (
-        <aside>
+        <aside className="drawer-panel">
           <div className="drawer-header">
             <div>
-              <p className="eyebrow">Receipt</p>
+              <span className="eyebrow-badge">Receipt Details</span>
               <h2 style={{ marginTop: 8 }}>
                 <span className={statusClass(selected.status)}>{selected.status}</span>
               </h2>
-              <p className="receipt-id">{selected.id}</p>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: '#666', marginTop: 4, wordBreak: 'break-all' }}>
+                {selected.id}
+              </p>
             </div>
-            <button
-              className="close-btn"
-              onClick={() => { setSelected(undefined); setDetail(undefined); }}
-            >
+            <button className="close-btn" onClick={() => { setSelected(undefined); setDetail(undefined); }}>
               ×
             </button>
           </div>
 
           {detail && (
             <>
-              <dl className="receipt-meta">
-                <dt>Key</dt>
-                <dd>{detail.idempotency_key}</dd>
-                {detail.method && <><dt>Method</dt><dd>{detail.method}</dd></>}
-                {detail.path && <><dt>Path</dt><dd>{detail.path}</dd></>}
-                {detail.upstream_status != null && <><dt>Upstream</dt><dd>{detail.upstream_status}</dd></>}
-                <dt>Attempts</dt>
-                <dd>{detail.attempt_count}</dd>
-                <dt>Created</dt>
-                <dd>{new Date(detail.created_at).toLocaleString()}</dd>
-                {detail.resolution_note && <><dt>Note</dt><dd>{detail.resolution_note}</dd></>}
+              <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: '0.9rem', marginBottom: 24 }}>
+                <dt style={{ color: '#666' }}>Key</dt>
+                <dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.idempotency_key}</dd>
+                {detail.method && <><dt style={{ color: '#666' }}>Method</dt><dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.method}</dd></>}
+                {detail.path && <><dt style={{ color: '#666' }}>Path</dt><dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.path}</dd></>}
+                <dt style={{ color: '#666' }}>Attempts</dt>
+                <dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.attempt_count}</dd>
               </dl>
 
-              {/* Event Timeline */}
+              {/* Timeline */}
               <div className="timeline">
-                <h3>Event Timeline</h3>
-                {detail.events.map((event) => (
-                  <div key={event.id} className="timeline-event">
-                    <div className={dotClass(event.kind)} />
-                    <div className="timeline-content">
-                      <div className="timeline-kind">{event.kind.replace(/_/g, ' ')}</div>
-                      <div className="timeline-time">
-                        {new Date(event.created_at).toLocaleTimeString()}
-                      </div>
+                <h4 style={{ fontSize: '0.9rem', textTransform: 'uppercase', color: '#666', marginBottom: 12 }}>Event Audit Trail</h4>
+                {detail.events.map((ev) => (
+                  <div key={ev.id} className="timeline-event">
+                    <div className="timeline-dot" />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{ev.kind.replace(/_/g, ' ')}</div>
+                      <div style={{ fontSize: '0.78rem', color: '#666' }}>{new Date(ev.created_at).toLocaleTimeString()}</div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Resolution */}
+              {/* Human Resolution for UNKNOWN */}
               {selected.status === 'UNKNOWN' && (
-                <div className="resolve-section">
-                  <h3>Resolve Ambiguity</h3>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
-                    Investigate the upstream (e.g., check the provider dashboard), then record the truth.
+                <div style={{ marginTop: 24, paddingTop: 20, borderTop: '2px solid var(--clr-dark)' }}>
+                  <h4 style={{ color: '#b88cff', fontSize: '1rem', marginBottom: 8 }}>Resolve Ambiguous Outcome</h4>
+                  <p style={{ fontSize: '0.85rem', color: '#555', marginBottom: 12 }}>
+                    Investigate upstream logs, then record the audit resolution:
                   </p>
-                  <div className="resolve-buttons">
-                    <button className="resolve-committed" onClick={() => void resolve('COMMITTED')}>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button className="btn btn-lime" style={{ flex: 1, padding: '10px' }} onClick={() => void resolve('COMMITTED')}>
                       ✓ Committed
                     </button>
-                    <button className="resolve-failed" onClick={() => void resolve('FAILED')}>
+                    <button className="btn btn-danger" style={{ flex: 1, padding: '10px' }} onClick={() => void resolve('FAILED')}>
                       ✗ Failed
                     </button>
                   </div>
@@ -329,8 +615,35 @@ export default function App() {
         </aside>
       )}
 
-      {/* Toast */}
-      {toast && <div className="toast">{toast}</div>}
+      {/* Footer */}
+      <footer className="site-footer">
+        <div className="container">
+          <div className="footer-card">
+            <div className="footer-top">
+              <a href="#" className="logo footer-logo">
+                <GateLogo />
+                <span>OnceGate</span>
+              </a>
+              <ul className="footer-nav">
+                <li><a href="#about">Overview</a></li>
+                <li><a href="#console">Live Console</a></li>
+                <li><a href="#calculator">Risk Calculator</a></li>
+                <li><a href="#matrix">IETF Matrix</a></li>
+                <li><a href="#process">Working Process</a></li>
+                <li><a href="#qa">Judge Q&A</a></li>
+              </ul>
+            </div>
+
+            <div className="footer-bottom">
+              <div>© 2026 OnceGate · Built for Zerops Challenge.</div>
+              <div><a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07" target="_blank" rel="noreferrer">IETF Draft Spec ↗</a></div>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* Toast Notification */}
+      {toast && <div className="toast-msg">{toast}</div>}
     </>
   );
 }
