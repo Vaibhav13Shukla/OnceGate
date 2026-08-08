@@ -89,7 +89,7 @@ export default function App() {
   const send = async (chaos?: string, storm = false) => {
     const key = newKey();
     setSending(true);
-    showToast(storm ? 'Dispatching 25 concurrent requests...' : chaos === 'slow' ? 'Simulating upstream timeout...' : chaos === 'die' ? 'Simulating upstream process failure...' : 'Dispatching test request...');
+    showToast(storm ? 'Dispatching 25 concurrent requests...' : chaos === 'slow' ? 'Simulating upstream timeout...' : chaos === 'die' ? 'Simulating upstream process crash...' : 'Dispatching test request...');
     try {
       const replies = await Promise.all(
         Array.from({ length: storm ? 25 : 1 }, () => api.charge(key, chaos))
@@ -106,7 +106,7 @@ export default function App() {
 
   const resolve = async (status: 'COMMITTED' | 'FAILED') => {
     if (!detail) return;
-    const note = window.prompt('Enter mandatory audit resolution note:');
+    const note = window.prompt('Enter audit resolution note:');
     if (!note) return;
     try {
       await api.resolve(detail.id, status, note, token);
@@ -131,7 +131,7 @@ export default function App() {
 
   return (
     <>
-      {/* Header */}
+      {/* Top Navbar */}
       <header className="site-header">
         <div className="container">
           <nav className="nav-wrapper">
@@ -141,62 +141,57 @@ export default function App() {
                 <span>OnceGate</span>
               </a>
               <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#191A23', color: '#B9FF66', fontWeight: 600, fontFamily: 'JetBrains Mono' }}>
-                v1.0.0
+                Proxy Control Plane
               </span>
             </div>
 
-            <ul className="nav-links">
-              <li><a href="#overview">Overview</a></li>
-              <li><a href="#operations">Operations</a></li>
-              <li><a href="#receipts">Audit Log</a></li>
-              <li><a href="#specification">Specification</a></li>
-            </ul>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input
-                type="password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Admin Token"
-                style={{ width: '130px', padding: '6px 12px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #191A23', fontFamily: 'JetBrains Mono' }}
-              />
-              <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#B9FF66', boxShadow: '0 0 6px #B9FF66' }} title="Gate Connected" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{ fontSize: '0.8rem', color: '#666', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+                Admin Secret:
+                <input
+                  type="password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder="Admin Token"
+                  style={{ width: '140px', padding: '6px 10px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid #191A23', fontFamily: 'JetBrains Mono' }}
+                />
+              </label>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#B9FF66', boxShadow: '0 0 6px #B9FF66' }} title="Connected" />
             </div>
           </nav>
         </div>
       </header>
 
       <main>
-        {/* Product Hero */}
-        <section className="hero" id="overview">
+        {/* Hero Banner & Integration Quick-Copy */}
+        <section className="hero" style={{ padding: '40px 0 30px' }}>
           <div className="container">
-            <h1 style={{ fontSize: 'clamp(2.4rem, 4vw, 3.6rem)', fontWeight: 700, lineHeight: 1.15, marginBottom: 16 }}>
+            <h1 style={{ fontSize: 'clamp(2rem, 3.5vw, 3rem)', fontWeight: 700, lineHeight: 1.15, marginBottom: 12 }}>
               Durable HTTP Idempotency Gateway
             </h1>
-            <p style={{ fontSize: '1.15rem', color: '#444', maxWidth: '720px', marginBottom: 28, lineHeight: 1.6 }}>
-              Reverse proxy engine that guarantees at-most-once execution for mutating HTTP APIs. Powered by PostgreSQL ACID transactions, sha256 payload locking, and explicit <code>UNKNOWN</code> outcome resolution.
+            <p style={{ fontSize: '1.1rem', color: '#444', maxWidth: '720px', marginBottom: 24, lineHeight: 1.5 }}>
+              Guarantees at-most-once execution for mutating HTTP APIs using PostgreSQL ACID claims, sha256 payload locking, and honest <code>UNKNOWN</code> outcome resolution.
             </p>
 
-            {/* Terminal Integration Box */}
-            <div style={{ backgroundColor: '#191A23', color: '#FFF', borderRadius: '16px', padding: '20px', maxWidth: '760px', fontFamily: 'JetBrains Mono', fontSize: '0.85rem', position: 'relative', border: '1px solid #191A23' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid #333', paddingBottom: 10 }}>
-                <span style={{ color: '#888', fontSize: '0.75rem' }}>HTTP Proxy Request Example</span>
+            <div style={{ backgroundColor: '#191A23', color: '#FFF', borderRadius: '12px', padding: '16px 20px', maxWidth: '740px', fontFamily: 'JetBrains Mono', fontSize: '0.82rem', border: '1px solid #191A23' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid #333', paddingBottom: 8 }}>
+                <span style={{ color: '#888', fontSize: '0.75rem' }}>Proxy Endpoint Example</span>
                 <button
                   onClick={copyCurl}
-                  style={{ background: 'transparent', border: '1px solid #444', color: '#B9FF66', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                  style={{ background: 'transparent', border: '1px solid #444', color: '#B9FF66', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600 }}
                 >
                   {copied ? 'Copied ✓' : 'Copy cURL'}
                 </button>
               </div>
-              <pre style={{ margin: 0, overflowX: 'auto', whiteSpace: 'pre-wrap', color: '#E2E8F0', lineHeight: 1.5 }}>
+              <pre style={{ margin: 0, overflowX: 'auto', whiteSpace: 'pre-wrap', color: '#E2E8F0', lineHeight: 1.45 }}>
                 {sampleCurl}
               </pre>
             </div>
           </div>
         </section>
 
-        {/* Live System Metrics */}
-        <section className="stats-banner" id="stats">
+        {/* Live Metrics Grid */}
+        <section className="stats-banner">
           <div className="container">
             <div className="stats-grid">
               <div className="stat-card">
@@ -219,22 +214,22 @@ export default function App() {
           </div>
         </section>
 
-        {/* Live Operations & Testing Panel */}
-        <section className="container" id="operations">
-          <div className="console-panel">
-            <div style={{ marginBottom: 20 }}>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Gateway Operations & Resilience Testing</h3>
-              <p style={{ color: '#666', fontSize: '0.95rem', marginTop: 4 }}>
-                Simulate client traffic and network failure scenarios through the OnceGate proxy:
+        {/* Control Toolbar & Action Trigger */}
+        <section className="container">
+          <div className="console-panel" style={{ padding: '24px' }}>
+            <div style={{ marginBottom: 16 }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Gateway Operations & Traffic Simulator</h3>
+              <p style={{ color: '#666', fontSize: '0.9rem', marginTop: 2 }}>
+                Dispatch mutating client requests to verify idempotency interception, retry handling, and fault behavior:
               </p>
             </div>
 
-            <div className="controls-flex">
+            <div className="controls-flex" style={{ gap: 10 }}>
               <button className="btn btn-secondary" onClick={() => void send()} disabled={sending}>
                 Execute Request
               </button>
               <button className="btn btn-lime" onClick={() => void send(undefined, true)} disabled={sending}>
-                Simulate Concurrent Storm (25x)
+                Fire Concurrent Storm (25x)
               </button>
               <button className="btn btn-secondary" onClick={() => void send('slow')} disabled={sending}>
                 Simulate Upstream Timeout
@@ -247,33 +242,33 @@ export default function App() {
               </button>
             </div>
 
-            <div className="status-bar-box">
+            <div className="status-bar-box" style={{ marginTop: 20 }}>
               <span>
-                Upstream DB Record Count: <span className="count-green">{chargeCount ?? '—'}</span>
+                Upstream DB Rows: <span className="count-green">{chargeCount ?? '—'}</span>
               </span>
               {stats && (
                 <span>
-                  Gateway Intercepted Duplicates: <span className="count-green">{stats.duplicates_prevented}</span>
+                  Intercepted Duplicates: <span className="count-green">{stats.duplicates_prevented}</span>
                 </span>
               )}
             </div>
           </div>
         </section>
 
-        {/* Receipt Audit Table */}
-        <section className="container" id="receipts">
+        {/* Live Receipt Audit Feed */}
+        <section className="container" style={{ marginBottom: 60 }}>
           <div className="table-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: '1.3rem', fontWeight: 700 }}>Durable Receipt Audit Feed</h3>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Durable Receipt Audit Feed</h3>
               <span style={{ fontSize: '0.8rem', color: '#666', fontFamily: 'JetBrains Mono' }}>
-                {receipts.length} total stored receipts
+                {receipts.length} stored receipts
               </span>
             </div>
 
             {loading && !receipts.length ? (
-              <p style={{ padding: 24, color: '#666' }}>Fetching database receipts...</p>
+              <p style={{ padding: 20, color: '#666' }}>Loading receipts from database...</p>
             ) : receipts.length === 0 ? (
-              <p style={{ padding: 24, color: '#666' }}>No active receipts. Execute an operation above to generate transactions.</p>
+              <p style={{ padding: 20, color: '#666' }}>No stored receipts. Dispatch a request above to generate idempotency claims.</p>
             ) : (
               <table>
                 <thead>
@@ -281,7 +276,7 @@ export default function App() {
                     <th>Idempotency Key</th>
                     <th>Status</th>
                     <th>Attempts</th>
-                    <th>Recorded</th>
+                    <th>Age</th>
                     <th>Audit</th>
                   </tr>
                 </thead>
@@ -304,41 +299,9 @@ export default function App() {
             )}
           </div>
         </section>
-
-        {/* Technical Architecture Specification */}
-        <section className="container" id="specification" style={{ marginBottom: 80 }}>
-          <div className="section-header">
-            <span className="section-title">Protocol Specification</span>
-            <p className="section-desc">
-              Implementation principles of the IETF <code>Idempotency-Key</code> specification enforced at the PostgreSQL layer.
-            </p>
-          </div>
-
-          <div className="matrix-grid">
-            <div className="matrix-card card-light">
-              <h4>ACID Claim Enforcement</h4>
-              <p>PostgreSQL <code>INSERT ... ON CONFLICT DO NOTHING</code> guarantees atomic claims across horizontal proxy replicas.</p>
-            </div>
-
-            <div className="matrix-card card-lime">
-              <h4>sha256 Payload Locking</h4>
-              <p>Reusing a key with altered HTTP method, path, or body parameters triggers a <code>422 Unprocessable Entity</code> response.</p>
-            </div>
-
-            <div className="matrix-card card-dark">
-              <h4>In-Flight Conflict Protection</h4>
-              <p>Simultaneous duplicate requests while a receipt is <code>PENDING</code> receive immediate <code>409 Conflict</code> with <code>Retry-After</code> headers.</p>
-            </div>
-
-            <div className="matrix-card card-light">
-              <h4>Deterministic UNKNOWN State</h4>
-              <p>Ambiguous upstream timeouts transition to <code>UNKNOWN</code>, blocking retries until explicitly audited and resolved.</p>
-            </div>
-          </div>
-        </section>
       </main>
 
-      {/* Drawer Overlay for Receipt Details */}
+      {/* Drawer Overlay for Receipt Inspection */}
       {selected && (
         <div className="drawer-overlay" onClick={() => { setSelected(undefined); setDetail(undefined); }} />
       )}
@@ -347,7 +310,7 @@ export default function App() {
         <aside className="drawer-panel">
           <div className="drawer-header">
             <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#666', fontWeight: 600 }}>Receipt Inspection</div>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#666', fontWeight: 600 }}>Receipt Details</div>
               <h2 style={{ marginTop: 6 }}>
                 <span className={statusClass(selected.status)}>{selected.status}</span>
               </h2>
@@ -410,22 +373,9 @@ export default function App() {
       {/* Footer */}
       <footer className="site-footer">
         <div className="container">
-          <div className="footer-card">
-            <div className="footer-top">
-              <a href="#" className="logo footer-logo">
-                <GateLogo />
-                <span>OnceGate</span>
-              </a>
-              <ul className="footer-nav">
-                <li><a href="#overview">Overview</a></li>
-                <li><a href="#operations">Operations</a></li>
-                <li><a href="#receipts">Audit Feed</a></li>
-                <li><a href="#specification">Specification</a></li>
-              </ul>
-            </div>
-
-            <div className="footer-bottom">
-              <div>© 2026 OnceGate · Durable Idempotency Platform</div>
+          <div className="footer-card" style={{ padding: '24px 32px' }}>
+            <div className="footer-bottom" style={{ paddingTop: 0, borderTop: 'none' }}>
+              <div>© 2026 OnceGate · Durable HTTP Idempotency Gateway</div>
               <div><a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07" target="_blank" rel="noreferrer">IETF Draft Specification ↗</a></div>
             </div>
           </div>
