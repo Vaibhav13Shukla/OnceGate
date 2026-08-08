@@ -1,6 +1,12 @@
 /// <reference types="vite/client" />
 
-const gateUrl = import.meta.env.VITE_GATE_URL ?? '';
+const envGateUrl = import.meta.env.VITE_GATE_URL;
+const gateUrl = envGateUrl !== undefined
+  ? envGateUrl
+  : (typeof window !== 'undefined' && window.location.hostname.includes('zerops.app')
+      ? window.location.origin.replace('console', 'gate')
+      : '');
+
 const adminHeaders = (token: string): Record<string, string> => token ? { authorization: `Bearer ${token}` } : {};
 
 export type Receipt = { id: string; idempotency_key: string; status: 'PENDING'|'COMMITTED'|'FAILED'|'UNKNOWN'; attempt_count: number; created_at: string; resolution_note?: string };

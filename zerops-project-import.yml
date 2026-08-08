@@ -3,17 +3,26 @@ project:
   description: Durable Idempotency-Key gateway
   corePackage: LIGHT
 services:
+  - hostname: db
+    type: postgresql@16
+    mode: NON_HA
+  - hostname: checkout
+    type: nodejs@22
+    mode: NON_HA
+    envSecrets:
+      DATABASE_URL: 'postgres://${db_user}:${db_password}@db:5432/${db_name}'
+      PORT: '3100'
   - hostname: gate
     type: nodejs@22
     mode: NON_HA
     enableSubdomainAccess: true
-  - hostname: checkout
-    type: nodejs@22
-    mode: NON_HA
+    envSecrets:
+      DATABASE_URL: 'postgres://${db_user}:${db_password}@db:5432/${db_name}'
+      UPSTREAM_BASE_URL: 'http://checkout:3100'
+      ADMIN_TOKEN: 'admin-secret'
+      CORS_ORIGIN: '*'
+      PORT: '3000'
   - hostname: console
     type: static
     mode: NON_HA
     enableSubdomainAccess: true
-  - hostname: db
-    type: postgresql@16
-    mode: NON_HA
