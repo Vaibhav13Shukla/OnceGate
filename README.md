@@ -101,8 +101,3 @@ $env:TEST_DATABASE_URL='postgres://oncegate:oncegate@localhost:54329/oncegate_te
 npm run test:integration
 ```
 
----
-
-## 📖 Judging Q&A & Design Decisions
-
-Detailed answers to architectural questions (why PostgreSQL vs Redis, why UNKNOWN state over auto-retry, why 4xx is COMMITTED) are documented in [`docs/judge-qa.md`](file:///c:/Users/LENOVO/OneDrive/Documents/ChatGPT/OnceGate/docs/judge-qa.md).
