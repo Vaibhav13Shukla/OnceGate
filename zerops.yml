@@ -47,8 +47,8 @@ zerops:
       base: nodejs@20
       buildCommands:
         - npm ci
-        - npm run build -w @oncegate/console
-      deployFiles: apps/console/dist
+        - npm run build
+      deployFiles: ./dist/~
     run:
       base: static
       ports:
