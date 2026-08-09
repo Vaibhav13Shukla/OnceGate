@@ -1,6 +1,24 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { buildServer } from '../apps/gate/src/server.js';
-import { loadConfig } from '../apps/gate/src/config.js';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// Load compiled gate server from dist/ if present, otherwise fall back to src/
+let buildServer: typeof import('../apps/gate/src/server.js').buildServer;
+let loadConfig: typeof import('../apps/gate/src/config.js').loadConfig;
+
+try {
+  const distServerPath = '../apps/gate/dist/server.js';
+  const distConfigPath = '../apps/gate/dist/config.js';
+  const gateDistMod = await import(distServerPath);
+  const gateConfigMod = await import(distConfigPath);
+  buildServer = gateDistMod.buildServer;
+  loadConfig = gateConfigMod.loadConfig;
+} catch {
+  const gateSrcMod = await import('../apps/gate/src/server.js');
+  const gateConfigMod = await import('../apps/gate/src/config.js');
+  buildServer = gateSrcMod.buildServer;
+  loadConfig = gateConfigMod.loadConfig;
+}
 
 let appInstance: ReturnType<typeof buildServer> | null = null;
 let initError: Error | null = null;
