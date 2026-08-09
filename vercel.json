@@ -3,6 +3,12 @@
   "installCommand": "npm install --include=dev --legacy-peer-deps",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
   "rewrites": [
     {
       "source": "/v1/:path*",
@@ -15,10 +21,6 @@
     {
       "source": "/healthz",
       "destination": "/api/index"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/index.html"
     }
   ]
 }

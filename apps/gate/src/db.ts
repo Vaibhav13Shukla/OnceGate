@@ -7,10 +7,16 @@ export function createPool(connectionString: string) {
                    connectionString.includes('.com') ||
                    process.env.VERCEL === '1';
 
-  return new pg.Pool({
+  const pool = new pg.Pool({
     connectionString,
     ssl: needsSsl ? { rejectUnauthorized: false } : undefined
   });
+
+  pool.on('error', (err) => {
+    console.error('Unexpected PostgreSQL pool error on idle client:', err);
+  });
+
+  return pool;
 }
 
 export type Database = ReturnType<typeof createPool>;
