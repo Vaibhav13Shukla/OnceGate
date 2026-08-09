@@ -48,14 +48,9 @@ zerops:
       buildCommands:
         - npm ci
         - npm run build -w @oncegate/console
-        - node -e "fs.cpSync('apps/console/dist', 'dist', {recursive: true})"
-      deployFiles:
-        - ./dist/~
+      deployFiles: apps/console/dist
     run:
       base: static
-      ports:
-        - port: 80
-          httpSupport: true
       routing:
         redirects:
           - from: /*
