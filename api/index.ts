@@ -1,34 +1,52 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { buildServer } from '../apps/gate/dist/server.js';
-import { loadConfig } from '../apps/gate/dist/config.js';
+import { buildServer } from '../apps/gate/src/server.js';
+import { loadConfig } from '../apps/gate/src/config.js';
 
 let appInstance: ReturnType<typeof buildServer> | null = null;
+let initError: Error | null = null;
 
-async function getApp() {
+function getApp() {
+  if (initError) throw initError;
   if (!appInstance) {
-    const env = {
-      ...process.env,
-      DATABASE_URL: process.env.DATABASE_URL || process.env.POSTGRES_URL || 'postgres://postgres:admin@localhost:5432/oncegate',
-      UPSTREAM_BASE_URL: process.env.UPSTREAM_BASE_URL || 'http://localhost:3100',
-      ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'admin-secret'
-    };
-    const config = loadConfig(env);
-    appInstance = buildServer({ config });
-    await appInstance.ready();
+    try {
+      const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DATABASE_URL;
+      const upstreamUrl = process.env.UPSTREAM_BASE_URL || 'https://httpbin.org';
+      const adminToken = process.env.ADMIN_TOKEN || 'admin-secret';
+
+      if (!dbUrl) {
+        throw new Error('DATABASE_URL or POSTGRES_URL is missing. Please set your PostgreSQL/Supabase connection string in Vercel Environment Variables.');
+      }
+
+      const env = {
+        ...process.env,
+        DATABASE_URL: dbUrl,
+        UPSTREAM_BASE_URL: upstreamUrl,
+        ADMIN_TOKEN: adminToken
+      };
+
+      const config = loadConfig(env);
+      appInstance = buildServer({ config });
+    } catch (err) {
+      initError = err instanceof Error ? err : new Error(String(err));
+      throw initError;
+    }
   }
   return appInstance;
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   try {
-    const app = await getApp();
+    const app = getApp();
+    await app.ready();
     app.server.emit('request', req, res);
   } catch (error) {
     res.statusCode = 500;
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({
-      error: 'Vercel Serverless Gateway Initialization Error',
-      detail: error instanceof Error ? error.message : String(error)
-    }));
+      ok: false,
+      error: 'OnceGate Vercel Serverless Gateway Error',
+      message: error instanceof Error ? error.message : String(error),
+      help: 'Ensure DATABASE_URL or POSTGRES_URL is configured in Vercel Project Settings.'
+    }, null, 2));
   }
 }
