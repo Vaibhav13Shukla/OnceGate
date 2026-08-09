@@ -14,6 +14,8 @@ export function buildServer(options: { config?: Config; db?: Database } = {}) {
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
   if (config.corsOrigin) app.register(cors, { origin: config.corsOrigin, methods: ['GET', 'POST', 'DELETE', 'OPTIONS'], allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Chaos', 'X-Tenant-Id'], exposedHeaders: ['OnceGate-Receipt', 'OnceGate-Replayed', 'OnceGate-Bypassed', 'OnceGate-Warning'] });
   app.addContentTypeParser('*', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
+  app.get('/', async () => ({ name: 'OnceGate API Gateway', version: '0.1.0', status: 'online', docs: 'https://github.com/Vaibhav13Shukla/OnceGate' }));
+  app.get('/api', async () => ({ name: 'OnceGate API Gateway', version: '0.1.0', status: 'online' }));
   app.get('/healthz', async (_request, reply) => {
     try { await db.query('SELECT 1'); return { ok: true, db: true }; }
     catch (error) { app.log.error({ err: error, operation: 'healthcheck' }, 'Database health check failed'); return reply.code(503).send({ ok: false, db: false }); }
