@@ -1,12 +1,16 @@
 import { readFile, readdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createPool } from '../db.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const databaseUrl = process.env.DATABASE_URL || 'postgres://localhost:5432/oncegate_test';
 try {
   const db = createPool(databaseUrl);
   await db.query('CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  const directory = resolve(import.meta.dirname, '../../migrations');
+  const directory = resolve(__dirname, '../../migrations');
   for (const name of (await readdir(directory)).filter((file) => file.endsWith('.sql')).sort()) {
     if ((await db.query('SELECT 1 FROM schema_migrations WHERE name=$1', [name])).rowCount) continue;
     await db.query('BEGIN');
