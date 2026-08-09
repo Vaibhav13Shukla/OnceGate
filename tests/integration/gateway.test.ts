@@ -87,6 +87,7 @@ describe('IETF-style proxy behavior', () => {
     const resolution = await gate.inject({ method: 'POST', url: `/v1/receipts/${receipt}/resolve`, headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' }, payload: { status: 'COMMITTED', note: 'verified upstream dashboard' } });
     expect(resolution.statusCode).toBe(200);
     expect(resolution.json().status).toBe('COMMITTED');
+    await new Promise((r) => setTimeout(r, 100));
   });
 
   it('forwards a mutating request without a key, warning the client', async () => {
