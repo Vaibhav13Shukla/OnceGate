@@ -31,7 +31,13 @@ export function buildServer(options: { config?: Config; db?: Database } = {}) {
   return app;
 }
 
-if (!process.env.VERCEL && process.argv[1]?.endsWith('server.js')) {
+if (!process.env.VERCEL) {
   const app = buildServer();
-  app.listen({ host: '0.0.0.0', port: Number(process.env.PORT ?? 3000) }).catch((error) => { app.log.error(error); process.exit(1); });
+  const port = Number(process.env.PORT ?? 3000);
+  app.listen({ host: '0.0.0.0', port }).then((address) => {
+    console.log(`OnceGate Proxy Server listening at ${address}`);
+  }).catch((error) => {
+    console.error('OnceGate Proxy Server startup error:', error);
+    process.exit(1);
+  });
 }
