@@ -11,7 +11,7 @@ services:
     priority: 1
 
   - hostname: cache
-    type: valkey@8
+    type: valkey@7.2
     mode: NON_HA
     priority: 1
 
