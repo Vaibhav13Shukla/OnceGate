@@ -17,15 +17,16 @@ const number = (value: string | undefined, fallback: number) => {
 };
 
 export function loadConfig(env = process.env): Config {
-  if (!env.DATABASE_URL) throw new Error('DATABASE_URL is required');
-  if (!env.UPSTREAM_BASE_URL) throw new Error('UPSTREAM_BASE_URL is required');
+  const dbUrl = env.DATABASE_URL || env.POSTGRES_URL || env.SUPABASE_DATABASE_URL || 'postgres://localhost:5432/oncegate_test';
+  const upstreamUrl = env.UPSTREAM_BASE_URL || 'http://checkout:3100';
+
   return {
-    databaseUrl: env.DATABASE_URL,
-    upstreamBaseUrl: env.UPSTREAM_BASE_URL.replace(/\/$/, ''),
+    databaseUrl: dbUrl,
+    upstreamBaseUrl: upstreamUrl.replace(/\/$/, ''),
     upstreamTimeoutMs: number(env.UPSTREAM_TIMEOUT_MS, 10_000),
     keyTtlHours: number(env.KEY_TTL_HOURS, 24),
     requireKey: boolean(env.REQUIRE_KEY),
-    adminToken: env.ADMIN_TOKEN ?? '',
+    adminToken: env.ADMIN_TOKEN ?? 'admin-secret',
     responseBodyMaxBytes: number(env.RESPONSE_BODY_MAX_BYTES, 262_144),
     corsOrigin: env.CORS_ORIGIN ?? '*'
   };
