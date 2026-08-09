@@ -48,9 +48,13 @@ zerops:
       buildCommands:
         - npm ci
         - npm run build -w @oncegate/console
-      deployFiles: apps/console/dist
+      deployFiles:
+        - ./apps/console/dist/~
     run:
       base: static
+      ports:
+        - port: 80
+          httpSupport: true
       routing:
         redirects:
           - from: /*
