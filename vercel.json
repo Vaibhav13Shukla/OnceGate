@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "apps/console/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/v1/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/p/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/healthz",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
