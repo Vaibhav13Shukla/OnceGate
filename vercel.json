@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "npm run build -w apps/console",
   "outputDirectory": "apps/console/dist",
   "framework": "vite",
