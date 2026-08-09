@@ -4,7 +4,7 @@ import { loadConfig, type Config } from './config.js';
 import { registerControlRoutes } from './control.js';
 import { createPool, type Database } from './db.js';
 import { proxyHandler } from './proxy.js';
-import { markStalePendingUnknown } from './sweeper.js';
+import { markStalePendingUnknown, purgeExpiredReceipts } from './sweeper.js';
 
 export function buildServer(options: { config?: Config; db?: Database } = {}) {
   const config = options.config ?? loadConfig();
@@ -12,7 +12,7 @@ export function buildServer(options: { config?: Config; db?: Database } = {}) {
   const app = Fastify({ logger: true });
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
-  if (config.corsOrigin) app.register(cors, { origin: config.corsOrigin, methods: ['GET', 'POST', 'DELETE', 'OPTIONS'], allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Chaos'], exposedHeaders: ['OnceGate-Receipt', 'OnceGate-Replayed', 'OnceGate-Bypassed', 'OnceGate-Warning'] });
+  if (config.corsOrigin) app.register(cors, { origin: config.corsOrigin, methods: ['GET', 'POST', 'DELETE', 'OPTIONS'], allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Chaos', 'X-Tenant-Id'], exposedHeaders: ['OnceGate-Receipt', 'OnceGate-Replayed', 'OnceGate-Bypassed', 'OnceGate-Warning'] });
   app.addContentTypeParser('*', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
   app.get('/healthz', async (_request, reply) => {
     try { await db.query('SELECT 1'); return { ok: true, db: true }; }
@@ -20,7 +20,10 @@ export function buildServer(options: { config?: Config; db?: Database } = {}) {
   });
   app.all('/p/*', proxyHandler(db, config));
   registerControlRoutes(app, db, config.adminToken);
-  const timer = setInterval(() => markStalePendingUnknown(db).catch((error) => app.log.error({ err: error, operation: 'pending_sweeper' }, 'Pending receipt sweeper failed')), 5_000);
+  const timer = setInterval(() => {
+    markStalePendingUnknown(db).catch((error) => app.log.error({ err: error, operation: 'pending_sweeper' }, 'Pending receipt sweeper failed'));
+    purgeExpiredReceipts(db).catch((error) => app.log.error({ err: error, operation: 'expiry_sweeper' }, 'Expired receipt purge failed'));
+  }, 5_000);
   app.addHook('onClose', async () => { clearInterval(timer); if (!options.db) await db.end(); });
   return app;
 }

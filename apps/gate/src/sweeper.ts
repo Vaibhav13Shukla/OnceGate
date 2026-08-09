@@ -6,3 +6,8 @@ export async function markStalePendingUnknown(db: Database): Promise<number> {
   for (const row of result.rows) await addEvent(db, row.id, 'MARKED_UNKNOWN', { reason: 'execution_deadline_elapsed' });
   return result.rowCount ?? 0;
 }
+
+export async function purgeExpiredReceipts(db: Database): Promise<number> {
+  const result = await db.query('DELETE FROM receipts WHERE expires_at < now()');
+  return result.rowCount ?? 0;
+}

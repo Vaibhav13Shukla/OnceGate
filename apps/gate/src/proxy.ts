@@ -67,7 +67,7 @@ export function proxyHandler(db: Database, config: Config) {
     const url = `${config.upstreamBaseUrl}${path}${request.url.includes('?') ? `?${request.url.split('?')[1]}` : ''}`;
     const body = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
     const tenantHeader = request.headers['x-tenant-id'];
-    const tenant = typeof tenantHeader === 'string' && tenantHeader.trim() ? tenantHeader.trim() : 'default';
+    const tenant = typeof tenantHeader === 'string' && tenantHeader.trim() && tenantHeader.length <= 128 ? tenantHeader.trim() : 'default';
 
     if (safeMethods.has(request.method)) {
       try {

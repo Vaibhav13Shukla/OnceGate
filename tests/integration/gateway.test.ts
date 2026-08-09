@@ -127,4 +127,75 @@ describe('IETF-style proxy behavior', () => {
     await badGate.close();
     await badDb.end();
   });
+
+  it('isolates receipts across tenants using X-Tenant-Id', async () => {
+    const key = 'tenant-test';
+    const first = await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': key, 'content-type': 'application/json', 'x-tenant-id': 'shop-A' }, payload: '{"amount":100}' });
+    expect(first.statusCode).toBe(200);
+    const second = await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': key, 'content-type': 'application/json', 'x-tenant-id': 'shop-B' }, payload: '{"amount":100}' });
+    expect(second.statusCode).toBe(200);
+    expect(second.headers['oncegate-replayed']).toBeUndefined();
+    expect(charges).toBe(2);
+  });
+
+  it('marks a 5xx upstream response as FAILED', async () => {
+    const response = await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': 'fivehundred', 'content-type': 'application/json', 'x-chaos': 'flaky' }, payload: '{"amount":100}' });
+    // The flaky chaos has 50% chance; regardless, if 500 was returned the receipt is FAILED
+    if (response.statusCode === 500) {
+      const receipt = await db.query('SELECT status FROM receipts WHERE idempotency_key = $1', ['fivehundred']);
+      expect(receipt.rows[0].status).toBe('FAILED');
+    }
+    // If it returned 200/201, the receipt is COMMITTED — both are valid
+    expect([200, 201, 500].includes(response.statusCode)).toBe(true);
+  });
+
+  it('rejects resolving an already COMMITTED receipt', async () => {
+    const first = await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': 'already-done', 'content-type': 'application/json' }, payload: '{"amount":100}' });
+    expect(first.statusCode).toBe(200);
+    const receipt = first.headers['oncegate-receipt'] as string;
+    const resolution = await gate.inject({ method: 'POST', url: `/v1/receipts/${receipt}/resolve`, headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' }, payload: { status: 'FAILED', note: 'should not work' } });
+    expect(resolution.statusCode).toBe(409);
+  });
+
+  it('returns accurate stats from /v1/stats', async () => {
+    const key = 'stats-test';
+    await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': key, 'content-type': 'application/json' }, payload: '{"amount":100}' });
+    await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': key, 'content-type': 'application/json' }, payload: '{"amount":100}' });
+    const response = await gate.inject({ method: 'GET', url: '/v1/stats', headers: { authorization: 'Bearer test-token' } });
+    expect(response.statusCode).toBe(200);
+    const stats = response.json();
+    expect(stats.total).toBe(1);
+    expect(stats.replayed).toBe(1);
+    expect(stats.duplicates_prevented).toBeGreaterThanOrEqual(1);
+  });
+
+  it('paginates receipts via cursor', async () => {
+    for (let i = 0; i < 3; i++) {
+      await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': `page-${i}`, 'content-type': 'application/json' }, payload: '{"amount":100}' });
+    }
+    const page1 = await gate.inject({ method: 'GET', url: '/v1/receipts?limit=2', headers: { authorization: 'Bearer test-token' } });
+    expect(page1.statusCode).toBe(200);
+    const body1 = page1.json();
+    expect(body1.items.length).toBe(2);
+    expect(body1.next_cursor).toBeTruthy();
+    const page2 = await gate.inject({ method: 'GET', url: `/v1/receipts?limit=2&cursor=${body1.next_cursor}`, headers: { authorization: 'Bearer test-token' } });
+    expect(page2.statusCode).toBe(200);
+    expect(page2.json().items.length).toBe(1);
+  });
+
+  it('returns healthy from /healthz', async () => {
+    const response = await gate.inject({ method: 'GET', url: '/healthz' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true, db: true });
+  });
+
+  it('preserves allowlisted headers on replay', async () => {
+    // The upstream sets content-type which is in the allowlist
+    const first = await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': 'header-test', 'content-type': 'application/json' }, payload: '{"amount":100}' });
+    expect(first.statusCode).toBe(200);
+    const replay = await gate.inject({ method: 'POST', url: '/p/charge', headers: { 'idempotency-key': 'header-test', 'content-type': 'application/json' }, payload: '{"amount":100}' });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.headers['oncegate-replayed']).toBe('true');
+    expect(replay.headers['content-type']).toMatch(/application\/json/);
+  });
 });

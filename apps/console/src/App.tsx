@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Receipt, type Stats } from './api';
 
 const newKey = () => crypto.randomUUID();
@@ -130,10 +130,11 @@ export default function App() {
     }
   };
 
-  const sampleCurl = `curl -X POST http://localhost:4000/p/charge \\
-  -H "Idempotency-Key: ${newKey()}" \\
+  const stableKey = useRef(newKey());
+  const sampleCurl = useMemo(() => `curl -X POST http://localhost:4000/p/charge \\
+  -H "Idempotency-Key: ${stableKey.current}" \\
   -H "Content-Type: application/json" \\
-  -d '{"amount": 4200, "currency": "USD"}'`;
+  -d '{"amount": 4200, "currency": "INR", "card_last4": "4242"}'`, []);
 
   const copyCurl = () => {
     navigator.clipboard.writeText(sampleCurl);
