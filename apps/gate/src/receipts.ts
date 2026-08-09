@@ -12,7 +12,10 @@ export async function addEvent(db: Database, receiptId: string, kind: string, de
   await db.query('INSERT INTO events (receipt_id, kind, detail) VALUES ($1, $2, $3)', [receiptId, kind, detail]);
 }
 
-export async function claimOrLoad(db: Database, input: { tenant: string; key: string; fingerprint: string; method: string; path: string; deadline: Date; expiresAt: Date }) {
+const MAX_CLAIM_RETRIES = 3;
+
+export async function claimOrLoad(db: Database, input: { tenant: string; key: string; fingerprint: string; method: string; path: string; deadline: Date; expiresAt: Date }, depth = 0): Promise<{ claimed: true; receipt: Receipt } | { claimed: false; receipt: Receipt }> {
+  if (depth >= MAX_CLAIM_RETRIES) throw new Error(`Could not claim or load receipt for key "${input.key}" after ${MAX_CLAIM_RETRIES} attempts`);
   await db.query('DELETE FROM receipts WHERE tenant = $1 AND idempotency_key = $2 AND expires_at <= now()', [input.tenant, input.key]);
   const inserted = await db.query<Receipt>(
     `INSERT INTO receipts (tenant, idempotency_key, fingerprint, method, path, execution_deadline, expires_at)
@@ -21,7 +24,7 @@ export async function claimOrLoad(db: Database, input: { tenant: string; key: st
   );
   if (inserted.rowCount) { await addEvent(db, inserted.rows[0].id, 'CLAIMED'); return { claimed: true as const, receipt: inserted.rows[0] }; }
   const existing = await db.query<Receipt>('SELECT * FROM receipts WHERE tenant = $1 AND idempotency_key = $2', [input.tenant, input.key]);
-  if (!existing.rowCount) return claimOrLoad(db, input);
+  if (!existing.rowCount) return claimOrLoad(db, input, depth + 1);
   await db.query('UPDATE receipts SET attempt_count = attempt_count + 1, updated_at = now() WHERE id = $1', [existing.rows[0].id]);
   existing.rows[0].attempt_count += 1;
   return { claimed: false as const, receipt: existing.rows[0] };

@@ -21,9 +21,8 @@ services:
     enableSubdomainAccess: true
     envSecrets:
       DATABASE_URL: 'postgres://${db_user}:${db_password}@db:5432/${db_name}'
-      VALKEY_URL: 'redis://cache:6379'
       UPSTREAM_BASE_URL: 'http://checkout:3100'
-      ADMIN_TOKEN: 'admin-secret'
+      ADMIN_TOKEN: '${zeropsGeneratedSecret32}'
       CORS_ORIGIN: '*'
       PORT: '3000'
   - hostname: console
