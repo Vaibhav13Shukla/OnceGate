@@ -38,10 +38,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   try {
     const app = getApp();
     await app.ready();
-    app.server.emit('request', req, res);
+    await new Promise<void>((resolve, reject) => {
+      res.on('finish', resolve);
+      res.on('close', resolve);
+      res.on('error', reject);
+      app.server.emit('request', req, res);
+    });
   } catch (error) {
-    res.statusCode = 500;
-    res.setHeader('content-type', 'application/json');
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader('content-type', 'application/json');
+    }
     res.end(JSON.stringify({
       ok: false,
       error: 'OnceGate Vercel Serverless Gateway Error',
