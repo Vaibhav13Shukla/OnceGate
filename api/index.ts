@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { buildServer } from '../apps/gate/src/server.js';
-import { loadConfig } from '../apps/gate/src/config.js';
+import { buildServer } from '../apps/gate/dist/server.js';
+import { loadConfig } from '../apps/gate/dist/config.js';
 
 let appInstance: ReturnType<typeof buildServer> | null = null;
 
