@@ -24,11 +24,12 @@ export function buildServer(options: { config?: Config; db?: Database } = {}) {
     markStalePendingUnknown(db).catch((error) => app.log.error({ err: error, operation: 'pending_sweeper' }, 'Pending receipt sweeper failed'));
     purgeExpiredReceipts(db).catch((error) => app.log.error({ err: error, operation: 'expiry_sweeper' }, 'Expired receipt purge failed'));
   }, 5_000);
+  if (typeof timer.unref === 'function') timer.unref();
   app.addHook('onClose', async () => { clearInterval(timer); if (!options.db) await db.end(); });
   return app;
 }
 
-if (process.argv[1]?.endsWith('server.js')) {
+if (!process.env.VERCEL && process.argv[1]?.endsWith('server.js')) {
   const app = buildServer();
   app.listen({ host: '0.0.0.0', port: Number(process.env.PORT ?? 3000) }).catch((error) => { app.log.error(error); process.exit(1); });
 }

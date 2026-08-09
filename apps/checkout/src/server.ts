@@ -20,6 +20,6 @@ app.delete('/charges', async () => { await db.query('DELETE FROM demo.charges');
 app.get('/healthz', async () => ({ ok: true }));
 app.addHook('onClose', async () => db.end());
 
-if (process.argv[1]?.endsWith('server.js')) app.listen({ host: '0.0.0.0', port: Number(process.env.PORT ?? 3100) }).catch((error) => { app.log.error(error); process.exit(1); });
+if (!process.env.VERCEL && process.argv[1]?.endsWith('server.js')) app.listen({ host: '0.0.0.0', port: Number(process.env.PORT ?? 3100) }).catch((error) => { app.log.error(error); process.exit(1); });
 
 export { app };
