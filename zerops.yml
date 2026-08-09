@@ -1,7 +1,7 @@
 zerops:
   - setup: gate
     build:
-      base: nodejs@22
+      base: nodejs@20
       buildCommands:
         - npm ci
         - npm run build -w @oncegate/gate
@@ -11,7 +11,7 @@ zerops:
         - apps/gate/package.json
         - node_modules
     run:
-      base: nodejs@22
+      base: nodejs@20
       ports:
         - port: 3000
           httpSupport: true
@@ -24,7 +24,7 @@ zerops:
           path: /healthz
   - setup: checkout
     build:
-      base: nodejs@22
+      base: nodejs@20
       buildCommands:
         - npm ci
         - npm run build -w @oncegate/checkout
@@ -33,7 +33,7 @@ zerops:
         - apps/checkout/package.json
         - node_modules
     run:
-      base: nodejs@22
+      base: nodejs@20
       ports:
         - port: 3100
           httpSupport: true
@@ -44,7 +44,7 @@ zerops:
           path: /healthz
   - setup: console
     build:
-      base: nodejs@22
+      base: nodejs@20
       buildCommands:
         - npm ci
         - npm run build -w @oncegate/console

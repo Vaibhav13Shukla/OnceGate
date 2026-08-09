@@ -16,7 +16,7 @@ services:
     priority: 1
 
   - hostname: checkout
-    type: nodejs@22
+    type: nodejs@20
     mode: NON_HA
     envSecrets:
       DATABASE_URL: ${db_connectionString}
@@ -24,7 +24,7 @@ services:
       PORT: '3100'
 
   - hostname: gate
-    type: nodejs@22
+    type: nodejs@20
     mode: NON_HA
     enableSubdomainAccess: true
     envSecrets:
