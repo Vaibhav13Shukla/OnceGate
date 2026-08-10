@@ -52,6 +52,9 @@ zerops:
         - apps/console/dist/~
     run:
       base: static
+      ports:
+        - port: 80
+          httpSupport: true
       routing:
         redirects:
           - from: /*
