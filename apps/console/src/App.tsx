@@ -17,7 +17,7 @@ function timeAgo(dateStr: string): string {
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${seconds}m ago`;
-  const hours = Math.floor(minutes / 60);
+  const hours = Math.floor(seconds / 60);
   return `${hours}h ago`;
 }
 
@@ -209,74 +209,78 @@ export default function App() {
 
   return (
     <>
-      {/* Header */}
+      {/* Positivus Header */}
       <header className="site-header">
         <div className="container">
           <nav className="nav-wrapper">
-            <a href="#" className="logo">
-              <GateLogo />
-              <span>OnceGate</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>Ops Console</span>
-            </a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <a href="#" className="logo">
+                <GateLogo />
+                <span>OnceGate</span>
+              </a>
+              <span style={{ fontSize: '0.75rem', padding: '3px 10px', borderRadius: '6px', backgroundColor: '#191A23', color: '#B9FF66', fontWeight: 600, fontFamily: 'JetBrains Mono' }}>
+                Proxy Control Plane
+              </span>
+            </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <button
                 onClick={() => setShowLimits(!showLimits)}
                 className="btn"
-                style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+                style={{ fontSize: '0.85rem', padding: '8px 14px', backgroundColor: '#191A23', color: '#FFF' }}
               >
-                Boundaries & Limitations
+                Technical Boundaries
               </button>
-              <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                Token:
+              <label style={{ fontSize: '0.85rem', color: '#191A23', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                Admin Secret:
                 <input
                   type="password"
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="Admin Token"
-                  style={{ width: '130px', padding: '6px 10px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}
+                  style={{ width: '140px', padding: '8px 12px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid #191A23', fontFamily: 'JetBrains Mono' }}
                 />
               </label>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--accent-green)' }} title="Connected" />
+              <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#B9FF66', border: '1px solid #191A23', boxShadow: '0 0 8px #B9FF66' }} title="Connected" />
             </div>
           </nav>
         </div>
       </header>
 
-      <main style={{ padding: '32px 0' }}>
-        {/* Live Metrics Grid */}
-        <section className="stats-banner" style={{ padding: '0 0 32px' }}>
+      <main style={{ padding: '30px 0 60px' }}>
+        {/* Positivus Stat Cards Grid */}
+        <section className="stats-banner" style={{ padding: '0 0 30px' }}>
           <div className="container">
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-label">Total requests</div>
+                <div className="stat-label">TOTAL REQUESTS</div>
                 <div className="stat-value">{stats?.total ?? '—'}</div>
               </div>
               <div className="stat-card">
-                <div className="stat-label">Replayed responses</div>
+                <div className="stat-label">REPLAYED RESPONSES</div>
                 <div className="stat-value">{stats?.replayed ?? '—'}</div>
               </div>
               <div className="stat-card highlight">
-                <div className="stat-label">Duplicates prevented</div>
+                <div className="stat-label">DUPLICATES PREVENTED</div>
                 <div className="stat-value">{stats?.duplicates_prevented ?? '—'}</div>
               </div>
               <div className="stat-card">
-                <div className="stat-label">Open UNKNOWN states</div>
+                <div className="stat-label">OPEN UNKNOWN STATES</div>
                 <div className="stat-value">{stats?.unknown_open ?? '—'}</div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Side-by-Side Comparison Studio */}
-        <section className="container" style={{ marginBottom: 24 }}>
-          <div className="console-panel">
+        {/* Side-by-Side Comparison Box (Positivus High-Contrast Dark Card) */}
+        <section className="container" style={{ marginBottom: 30 }}>
+          <div className="console-panel" style={{ backgroundColor: '#191A23', color: '#FFF' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 4px' }}>
-                  Side-by-Side Lost Response Experiment
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 6px', color: '#FFF' }}>
+                  Side-by-Side "Lost Response" Experiment
                 </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: '640px', margin: 0 }}>
+                <p style={{ color: '#A0AEC0', fontSize: '0.9rem', maxWidth: '680px', margin: 0 }}>
                   Simulates a network failure after database execution. Compares direct upstream retry vs OnceGate proxy handling.
                 </p>
               </div>
@@ -285,65 +289,66 @@ export default function App() {
                 className="btn btn-primary"
                 onClick={() => void runBeforeAfterDemo()}
                 disabled={compRunning}
+                style={{ padding: '12px 20px', fontSize: '0.95rem' }}
               >
-                {compRunning ? 'Running test...' : 'Run comparison test'}
+                {compRunning ? 'Running test...' : 'Run Before / After Proof'}
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 24 }}>
               {/* Direct Upstream */}
-              <div style={{ backgroundColor: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)' }}>
-                <div style={{ color: 'var(--accent-red)', fontWeight: 600, fontSize: '0.85rem', marginBottom: 6 }}>
-                  Direct Upstream (No Proxy)
+              <div style={{ backgroundColor: '#262838', padding: '20px', borderRadius: '14px', border: '1px solid #f06272' }}>
+                <div style={{ color: '#f06272', fontWeight: 700, fontSize: '0.9rem', marginBottom: 6 }}>
+                  WITHOUT ONCEGATE (Direct Upstream)
                 </div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 12 }}>
-                  Request → DB Charge Inserted → Socket Dropped → Client Retries
+                <p style={{ fontSize: '0.82rem', color: '#CBD5E0', marginBottom: 14 }}>
+                  Client POST → Payment Executed → Connection Drops → Client Retries
                 </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-red)' }}>
-                  <span>DB Charges Executed:</span>
-                  <span>{compResult.directAfter !== undefined ? `${compResult.directAfter - compResult.directBefore} (Duplicate side-effect)` : '—'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 700, color: '#f06272', backgroundColor: '#191A23', padding: '10px 14px', borderRadius: '8px' }}>
+                  <span>Upstream Charges Executed:</span>
+                  <span>{compResult.directAfter !== undefined ? `${compResult.directAfter - compResult.directBefore} (DUPLICATE 💥)` : 'Run test to measure'}</span>
                 </div>
               </div>
 
               {/* OnceGate Proxy */}
-              <div style={{ backgroundColor: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(34,197,94,0.3)' }}>
-                <div style={{ color: 'var(--accent-green)', fontWeight: 600, fontSize: '0.85rem', marginBottom: 6 }}>
-                  OnceGate Idempotency Proxy
+              <div style={{ backgroundColor: '#262838', padding: '20px', borderRadius: '14px', border: '1px solid #B9FF66' }}>
+                <div style={{ color: '#B9FF66', fontWeight: 700, fontSize: '0.9rem', marginBottom: 6 }}>
+                  WITH ONCEGATE PROXY
                 </div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 12 }}>
-                  Request → Postgres Claim → Socket Dropped → Retry Intercepted
+                <p style={{ fontSize: '0.82rem', color: '#CBD5E0', marginBottom: 14 }}>
+                  Client POST → Postgres Claim → Connection Drops → Retry Intercepted
                 </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-green)' }}>
-                  <span>DB Charges Executed:</span>
-                  <span>{compResult.gateAfter !== undefined ? `${compResult.gateAfter - compResult.gateBefore} (Deduplicated)` : '—'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 700, color: '#B9FF66', backgroundColor: '#191A23', padding: '10px 14px', borderRadius: '8px' }}>
+                  <span>Upstream Charges Executed:</span>
+                  <span>{compResult.gateAfter !== undefined ? `${compResult.gateAfter - compResult.gateBefore} (PROTECTED 🛡️)` : 'Run test to measure'}</span>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Test Scenarios Toolbar */}
-        <section className="container" style={{ marginBottom: 24 }}>
+        {/* Test Scenarios Toolbar (Positivus Light Card) */}
+        <section className="container" style={{ marginBottom: 30 }}>
           <div className="console-panel">
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 12 }}>
-              Test Scenarios
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 8, color: '#191A23' }}>
+              Interactive Failure Lab & Chaos Studio
             </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 16 }}>
-              Dispatch test requests through the gateway to verify concurrency locking, timeout handling, and payload validation.
+            <p style={{ color: '#555', fontSize: '0.92rem', marginBottom: 20 }}>
+              Dispatch test requests through the gateway to verify concurrency locking, timeout handling, and payload validation:
             </p>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button className="btn" onClick={() => void send('normal')} disabled={sending}>
                 Standard Request
               </button>
-              <button className="btn" onClick={() => void send('storm')} disabled={sending}>
-                Concurrent Requests (25x)
+              <button className="btn btn-primary" onClick={() => void send('storm')} disabled={sending}>
+                Concurrent Storm (25x)
               </button>
               <button className="btn" onClick={() => void send('drop')} disabled={sending}>
                 Lost Response (Socket Drop)
               </button>
               <button className="btn" onClick={() => void send('mismatch')} disabled={sending}>
-                Payload Mismatch (422)
+                Payload Mismatch Retry (422)
               </button>
               <button className="btn" onClick={() => void send('slow')} disabled={sending}>
                 Upstream Timeout (15s)
@@ -352,53 +357,57 @@ export default function App() {
                 Upstream Process Crash
               </button>
               <button className="btn" onClick={() => void api.resetCharges().then(refresh)} disabled={sending}>
-                Clear DB Storage
+                Reset PostgreSQL Storage
               </button>
             </div>
 
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-color)', display: 'flex', gap: 24, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              <span>Upstream database rows (`demo.charges`): <strong style={{ color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>{chargeCount ?? '—'}</strong></span>
-              <span>Prevented duplicates: <strong style={{ color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>{stats?.duplicates_prevented ?? 0}</strong></span>
+            <div className="status-bar-box" style={{ marginTop: 24 }}>
+              <span>
+                Upstream DB Rows (`demo.charges`): <span className="count-green">{chargeCount ?? '—'}</span>
+              </span>
+              <span>
+                Prevented Duplicates: <span className="count-green">{stats?.duplicates_prevented ?? 0}</span>
+              </span>
             </div>
           </div>
         </section>
 
-        {/* Receipts Feed */}
+        {/* Receipts Feed Table Card */}
         <section className="container">
           <div className="table-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Durable Receipts</h3>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                {receipts.length} receipts
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#191A23' }}>Durable Receipt Audit Feed</h3>
+              <span style={{ fontSize: '0.85rem', color: '#666', fontFamily: 'JetBrains Mono', fontWeight: 600 }}>
+                {receipts.length} stored receipts
               </span>
             </div>
 
             {loading && !receipts.length ? (
-              <p style={{ padding: '16px 0', color: 'var(--text-muted)' }}>Loading receipts...</p>
+              <p style={{ padding: '20px 0', color: '#666' }}>Loading receipts from database...</p>
             ) : receipts.length === 0 ? (
-              <p style={{ padding: '16px 0', color: 'var(--text-muted)' }}>No stored receipts. Send a request above to generate claims.</p>
+              <p style={{ padding: '20px 0', color: '#666' }}>No stored receipts. Dispatch a request above to generate idempotency claims.</p>
             ) : (
               <table>
                 <thead>
                   <tr>
-                    <th>Idempotency key</th>
+                    <th>Idempotency Key</th>
                     <th>Status</th>
                     <th>Attempts</th>
-                    <th>Created</th>
-                    <th>Action</th>
+                    <th>Age</th>
+                    <th>Audit</th>
                   </tr>
                 </thead>
                 <tbody>
                   {receipts.map((r) => (
                     <tr key={r.id} onClick={() => void inspect(r)}>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>{r.idempotency_key.slice(0, 32)}...</td>
+                      <td style={{ fontFamily: 'JetBrains Mono', fontWeight: 600 }}>{r.idempotency_key.slice(0, 32)}...</td>
                       <td>
                         <span className={statusClass(r.status)}>{r.status}</span>
                       </td>
                       <td>{r.attempt_count}</td>
                       <td>{timeAgo(r.created_at)}</td>
                       <td>
-                        <span style={{ color: 'var(--accent-green)', fontSize: '0.85rem' }}>Inspect →</span>
+                        <span style={{ textDecoration: 'underline', fontWeight: 700, fontSize: '0.88rem', color: '#191A23' }}>Inspect Trail →</span>
                       </td>
                     </tr>
                   ))}
@@ -418,12 +427,12 @@ export default function App() {
         <aside className="drawer-panel">
           <div className="drawer-header">
             <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>Receipt Details</div>
-              <h2>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#666', fontWeight: 600 }}>Receipt Details</div>
+              <h2 style={{ marginTop: 6 }}>
                 <span className={statusClass(selected.status)}>{selected.status}</span>
               </h2>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4, wordBreak: 'break-all' }}>
-                {selected.id}
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: '#666', marginTop: 4, wordBreak: 'break-all' }}>
+                ID: {selected.id}
               </p>
             </div>
             <button className="close-btn" onClick={() => { setSelected(undefined); setDetail(undefined); setExplanation(null); setResolveTarget(null); }}>
@@ -433,32 +442,32 @@ export default function App() {
 
           {detail && (
             <>
-              <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: '0.88rem', marginBottom: 20 }}>
-                <dt style={{ color: 'var(--text-muted)' }}>Idempotency key</dt>
-                <dd style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>{detail.idempotency_key}</dd>
-                {detail.method && <><dt style={{ color: 'var(--text-muted)' }}>Method</dt><dd style={{ fontFamily: 'var(--font-mono)' }}>{detail.method}</dd></>}
-                {detail.path && <><dt style={{ color: 'var(--text-muted)' }}>Path</dt><dd style={{ fontFamily: 'var(--font-mono)' }}>{detail.path}</dd></>}
-                <dt style={{ color: 'var(--text-muted)' }}>Attempts</dt>
-                <dd style={{ fontFamily: 'var(--font-mono)' }}>{detail.attempt_count}</dd>
+              <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: '0.88rem', marginBottom: 24 }}>
+                <dt style={{ color: '#666' }}>Idempotency Key</dt>
+                <dd style={{ fontFamily: 'JetBrains Mono', wordBreak: 'break-all' }}>{detail.idempotency_key}</dd>
+                {detail.method && <><dt style={{ color: '#666' }}>HTTP Method</dt><dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.method}</dd></>}
+                {detail.path && <><dt style={{ color: '#666' }}>Target Path</dt><dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.path}</dd></>}
+                <dt style={{ color: '#666' }}>Total Attempts</dt>
+                <dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.attempt_count}</dd>
               </dl>
 
               {/* Diagnosis Button */}
               <div style={{ marginBottom: 20 }}>
                 <button
-                  className="btn"
-                  style={{ width: '100%', fontSize: '0.85rem' }}
+                  className="btn btn-primary"
+                  style={{ width: '100%', fontSize: '0.9rem' }}
                   onClick={() => void fetchExplanation(detail.id)}
                 >
-                  Analyze audit trail
+                  Analyze Audit Trail
                 </button>
               </div>
 
               {/* Diagnosis Box */}
               {explanation && (
-                <div style={{ marginBottom: 24, padding: '14px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.85rem' }}>
-                  <div style={{ color: 'var(--accent-green)', fontWeight: 600, marginBottom: 6 }}>Audit Analysis</div>
-                  <p style={{ margin: '0 0 8px', color: 'var(--text-main)', lineHeight: 1.5 }}>{explanation.summary}</p>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                <div style={{ marginBottom: 24, padding: '16px', backgroundColor: '#191A23', color: '#FFF', borderRadius: '14px', fontSize: '0.85rem' }}>
+                  <div style={{ color: '#B9FF66', fontWeight: 700, marginBottom: 6 }}>Audit Analysis</div>
+                  <p style={{ margin: '0 0 10px', color: '#FFF', lineHeight: 1.5 }}>{explanation.summary}</p>
+                  <div style={{ color: '#CBD5E0', fontSize: '0.8rem', backgroundColor: '#262838', padding: '10px', borderRadius: '8px' }}>
                     <strong>Action:</strong> {explanation.remediation}
                   </div>
                 </div>
@@ -466,13 +475,13 @@ export default function App() {
 
               {/* Event Timeline */}
               <div className="timeline">
-                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>Audit Log</div>
+                <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', color: '#666', marginBottom: 12, letterSpacing: '0.05em' }}>Event Audit Timeline</h4>
                 {detail.events.map((ev) => (
                   <div key={ev.id} className="timeline-event">
                     <div className="timeline-dot" />
                     <div>
-                      <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{ev.kind.replace(/_/g, ' ')}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(ev.created_at).toLocaleTimeString()}</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ev.kind.replace(/_/g, ' ')}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#666' }}>{new Date(ev.created_at).toLocaleTimeString()}</div>
                     </div>
                   </div>
                 ))}
@@ -480,12 +489,12 @@ export default function App() {
 
               {/* Manual Resolution for UNKNOWN */}
               {selected.status === 'UNKNOWN' && (
-                <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-color)' }}>
-                  <div style={{ color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 600, marginBottom: 4 }}>Manual Resolution</div>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 12 }}>
+                <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #DDD' }}>
+                  <h4 style={{ color: '#191A23', fontSize: '0.95rem', fontWeight: 700, marginBottom: 6 }}>Manual Resolution Required</h4>
+                  <p style={{ fontSize: '0.82rem', color: '#555', marginBottom: 12 }}>
                     Verify upstream database status, then record audit resolution:
                   </p>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 10 }}>
                     <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => setResolveTarget('COMMITTED')}>
                       Mark COMMITTED
                     </button>
@@ -500,14 +509,14 @@ export default function App() {
         </aside>
       )}
 
-      {/* Limitations Modal */}
+      {/* Technical Boundaries Modal */}
       {showLimits && (
         <div className="drawer-overlay" style={{ zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowLimits(false)}>
-          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '24px', maxWidth: '540px', width: '90%', border: '1px solid var(--border-color)' }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 12, color: 'var(--text-main)' }}>
-              Technical Boundaries & Limitations
+          <div style={{ backgroundColor: '#FFF', borderRadius: '20px', padding: '28px', maxWidth: '580px', width: '90%', border: '2px solid #191A23', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 12, color: '#191A23' }}>
+              What OnceGate Cannot Know (Transparent Boundaries)
             </h3>
-            <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            <div style={{ fontSize: '0.9rem', color: '#444', lineHeight: 1.6 }}>
               <p style={{ marginBottom: 10 }}>
                 <strong>Network Ambiguity:</strong> If the gateway forwards a request to an upstream service and the connection drops before HTTP headers arrive, OnceGate cannot determine from outside whether the upstream executed the side-effect.
               </p>
@@ -530,21 +539,21 @@ export default function App() {
       {/* Resolution Confirmation Modal */}
       {resolveTarget && (
         <div className="drawer-overlay" style={{ zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '24px', maxWidth: '440px', width: '90%', border: '1px solid var(--border-color)' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-main)' }}>
-              Resolve to {resolveTarget}
+          <div style={{ backgroundColor: '#FFF', borderRadius: '20px', padding: '28px', maxWidth: '440px', width: '90%', border: '2px solid #191A23', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8, color: '#191A23' }}>
+              Confirm Audit Resolution → <span style={{ color: resolveTarget === 'COMMITTED' ? '#2E7D32' : '#C62828' }}>{resolveTarget}</span>
             </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-              Provide a mandatory audit note explaining why this receipt is being resolved:
+            <p style={{ fontSize: '0.88rem', color: '#555', marginBottom: 16 }}>
+              Provide a mandatory audit note documenting why this receipt is being marked as {resolveTarget}:
             </p>
             <textarea
               value={resolutionNote}
               onChange={(e) => setResolutionNote(e.target.value)}
-              placeholder="e.g. Verified charge in upstream PostgreSQL database logs."
+              placeholder="e.g. Verified transaction in upstream PostgreSQL database logs."
               rows={3}
-              style={{ width: '100%', padding: '10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginBottom: 16 }}
+              style={{ width: '100%', padding: '10px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid #191A23', fontFamily: 'sans-serif', marginBottom: 18 }}
             />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button
                 className="btn"
                 onClick={() => { setResolveTarget(null); setResolutionNote(''); }}
@@ -557,7 +566,7 @@ export default function App() {
                 onClick={() => void confirmResolve()}
                 disabled={resolving}
               >
-                {resolving ? 'Saving...' : 'Submit Resolution'}
+                {resolving ? 'Recording...' : 'Submit Resolution'}
               </button>
             </div>
           </div>
@@ -572,7 +581,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Toast */}
+      {/* Toast Notification */}
       {toast && <div className="toast-msg">{toast}</div>}
     </>
   );
