@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Explanation, type Receipt, type Stats } from './api';
 
 const newKey = () => crypto.randomUUID();
@@ -38,10 +38,9 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [showLimits, setShowLimits] = useState(false);
 
-  // Before/After Comparison State
+  // Side-by-Side Experiment State
   const [compRunning, setCompRunning] = useState(false);
   const [compResult, setCompResult] = useState<{
     directBefore?: number;
@@ -50,7 +49,7 @@ export default function App() {
     gateAfter?: number;
   }>({});
 
-  // In-App Resolution Modal State
+  // Audit Resolution Modal State
   const [resolveTarget, setResolveTarget] = useState<'COMMITTED' | 'FAILED' | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
   const [resolving, setResolving] = useState(false);
@@ -81,7 +80,7 @@ export default function App() {
       if (nextStats) setStats(nextStats);
       if (nextReceipts) setReceipts(nextReceipts.items);
     } catch {
-      // Quiet background polling
+      // Quiet background refresh
     } finally {
       setLoading(false);
     }
@@ -105,7 +104,7 @@ export default function App() {
 
   const fetchExplanation = async (receiptId: string) => {
     try {
-      showToast('Generating evidence-grounded AI diagnosis...');
+      showToast('Analyzing database trail...');
       const exp = await api.explain(receiptId, token);
       setExplanation(exp);
     } catch (err) {
@@ -115,21 +114,19 @@ export default function App() {
 
   const runBeforeAfterDemo = async () => {
     setCompRunning(true);
-    showToast('Executing Before/After Failure Experiment...');
+    showToast('Executing side-by-side comparison...');
     try {
       await api.resetCharges();
       const initialCount = (await api.chargeCount()).count;
 
-      // 1. Direct Upstream (WITHOUT OnceGate): dispatch charge with x-chaos: drop -> connection drops -> retry
+      // 1. Direct Upstream (Without OnceGate)
       const directKey = newKey();
-      showToast('Phase 1: Retrying lost response WITHOUT OnceGate (Direct Upstream)...');
       await api.directCharge(directKey, 'drop').catch(() => null);
       await api.directCharge(directKey, 'drop').catch(() => null);
       const directCount = (await api.chargeCount()).count;
 
-      // 2. OnceGate Proxy (WITH OnceGate): dispatch charge with x-chaos: drop -> connection drops -> retry
+      // 2. OnceGate Proxy (With OnceGate)
       const gateKey = newKey();
-      showToast('Phase 2: Retrying lost response WITH OnceGate Proxy...');
       await api.charge(gateKey, 'drop').catch(() => null);
       await api.charge(gateKey, 'drop').catch(() => null);
       const gateCount = (await api.chargeCount()).count;
@@ -141,10 +138,10 @@ export default function App() {
         gateAfter: gateCount
       });
 
-      showToast('Experiment completed! Check Before/After results below.');
+      showToast('Comparison completed.');
       await refresh();
-    } catch (err) {
-      showToast('Comparison experiment error');
+    } catch {
+      showToast('Comparison error');
     } finally {
       setCompRunning(false);
     }
@@ -156,33 +153,33 @@ export default function App() {
 
     try {
       if (type === 'mismatch') {
-        showToast('Sending initial request with amount ₹4,200...');
+        showToast('Sending initial request (amount: ₹4,200)...');
         await api.charge(key, undefined, { amount: 4200, currency: 'INR', card_last4: '4242' });
-        showToast('Retrying same key with payload mismatch (amount ₹99,999)...');
+        showToast('Retrying same key with modified body (amount: ₹99,999)...');
         await api.charge(key, undefined, { amount: 99999, currency: 'INR', card_last4: '4242' });
       } else if (type === 'drop') {
-        showToast('Simulating lost response (socket termination after DB execution)...');
+        showToast('Simulating lost response (socket dropped post-execution)...');
         await api.charge(key, 'drop');
       } else if (type === 'die') {
         showToast('Simulating upstream process crash...');
         await api.charge(key, 'die');
       } else if (type === 'slow') {
-        showToast('Simulating upstream timeout (15s delay past 10s gateway limit)...');
+        showToast('Simulating upstream delay (15s)...');
         await api.charge(key, 'slow');
       } else if (type === 'storm') {
-        showToast('Dispatching 25 concurrent requests with identical key...');
+        showToast('Sending 25 parallel requests...');
         const replies = await Promise.all(
           Array.from({ length: 25 }, () => api.charge(key))
         );
-        showToast(`Processed ${replies.length} parallel requests — 24 duplicate claims blocked in DB`);
+        showToast(`Completed 25 requests — duplicates intercepted`);
       } else {
-        showToast('Dispatching standard payment request...');
+        showToast('Sending request...');
         await api.charge(key);
-        showToast('Operation processed successfully');
+        showToast('Request processed successfully');
       }
       await refresh();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Operation failed');
+      showToast(err instanceof Error ? err.message : 'Request failed');
       await refresh();
     } finally {
       setSending(false);
@@ -192,13 +189,13 @@ export default function App() {
   const confirmResolve = async () => {
     if (!detail || !resolveTarget) return;
     if (!resolutionNote.trim()) {
-      showToast('Resolution audit note is required');
+      showToast('Audit note required');
       return;
     }
     setResolving(true);
     try {
       await api.resolve(detail.id, resolveTarget, resolutionNote.trim(), token);
-      showToast(`Receipt ${detail.id.slice(0, 8)} resolved to ${resolveTarget}`);
+      showToast(`Receipt resolved to ${resolveTarget}`);
       setResolveTarget(null);
       setResolutionNote('');
       await refresh();
@@ -210,255 +207,198 @@ export default function App() {
     }
   };
 
-  const stableKey = useRef(newKey());
-  const sampleCurl = useMemo(() => `curl -X POST http://localhost:4000/p/charge \\
-  -H "Idempotency-Key: ${stableKey.current}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"amount": 4200, "currency": "INR", "card_last4": "4242"}'`, []);
-
-  const copyCurl = () => {
-    navigator.clipboard.writeText(sampleCurl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   return (
     <>
-      {/* Top Navbar */}
+      {/* Header */}
       <header className="site-header">
         <div className="container">
           <nav className="nav-wrapper">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <a href="#" className="logo">
-                <GateLogo />
-                <span>OnceGate</span>
-              </a>
-              <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#191A23', color: '#B9FF66', fontWeight: 600, fontFamily: 'JetBrains Mono' }}>
-                Proxy Control Plane
-              </span>
-            </div>
+            <a href="#" className="logo">
+              <GateLogo />
+              <span>OnceGate</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>Ops Console</span>
+            </a>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <button
                 onClick={() => setShowLimits(!showLimits)}
-                style={{ background: '#191A23', color: '#E2E8F0', border: '1px solid #333', padding: '5px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
+                className="btn"
+                style={{ fontSize: '0.82rem', padding: '6px 12px' }}
               >
-                <span>ℹ️ Technical Boundaries</span>
+                Boundaries & Limitations
               </button>
-              <label style={{ fontSize: '0.8rem', color: '#666', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
-                Admin Secret:
+              <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                Token:
                 <input
                   type="password"
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="Admin Token"
-                  style={{ width: '140px', padding: '6px 10px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid #191A23', fontFamily: 'JetBrains Mono' }}
+                  style={{ width: '130px', padding: '6px 10px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}
                 />
               </label>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#B9FF66', boxShadow: '0 0 6px #B9FF66' }} title="Connected" />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--accent-green)' }} title="Connected" />
             </div>
           </nav>
         </div>
       </header>
 
-      <main>
-        {/* Hero Banner & Integration Quick-Copy */}
-        <section className="hero" style={{ padding: '40px 0 30px' }}>
-          <div className="container">
-            <h1 style={{ fontSize: 'clamp(2rem, 3.5vw, 3rem)', fontWeight: 700, lineHeight: 1.15, marginBottom: 12 }}>
-              Durable HTTP Idempotency Gateway
-            </h1>
-            <p style={{ fontSize: '1.1rem', color: '#444', maxWidth: '720px', marginBottom: 24, lineHeight: 1.5 }}>
-              Guarantees at-most-once execution for mutating HTTP APIs using PostgreSQL ACID claims, SHA-256 payload locking, and honest <code>UNKNOWN</code> outcome resolution.
-            </p>
-
-            <div style={{ backgroundColor: '#191A23', color: '#FFF', borderRadius: '12px', padding: '16px 20px', maxWidth: '740px', fontFamily: 'JetBrains Mono', fontSize: '0.82rem', border: '1px solid #191A23' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid #333', paddingBottom: 8 }}>
-                <span style={{ color: '#888', fontSize: '0.75rem' }}>Proxy Endpoint Example</span>
-                <button
-                  onClick={copyCurl}
-                  style={{ background: 'transparent', border: '1px solid #444', color: '#B9FF66', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600 }}
-                >
-                  {copied ? 'Copied ✓' : 'Copy cURL'}
-                </button>
-              </div>
-              <pre style={{ margin: 0, overflowX: 'auto', whiteSpace: 'pre-wrap', color: '#E2E8F0', lineHeight: 1.45 }}>
-                {sampleCurl}
-              </pre>
-            </div>
-          </div>
-        </section>
-
+      <main style={{ padding: '32px 0' }}>
         {/* Live Metrics Grid */}
-        <section className="stats-banner">
+        <section className="stats-banner" style={{ padding: '0 0 32px' }}>
           <div className="container">
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-label">Total Requests</div>
+                <div className="stat-label">Total requests</div>
                 <div className="stat-value">{stats?.total ?? '—'}</div>
               </div>
               <div className="stat-card">
-                <div className="stat-label">Replayed Responses</div>
+                <div className="stat-label">Replayed responses</div>
                 <div className="stat-value">{stats?.replayed ?? '—'}</div>
               </div>
               <div className="stat-card highlight">
-                <div className="stat-label">Duplicates Prevented</div>
+                <div className="stat-label">Duplicates prevented</div>
                 <div className="stat-value">{stats?.duplicates_prevented ?? '—'}</div>
               </div>
               <div className="stat-card">
-                <div className="stat-label">Open UNKNOWN Outcomes</div>
+                <div className="stat-label">Open UNKNOWN states</div>
                 <div className="stat-value">{stats?.unknown_open ?? '—'}</div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* SECTION 1: Before/After Failure Experiment Studio (Brace Moment) */}
-        <section className="container" style={{ marginBottom: 30 }}>
-          <div className="console-panel" style={{ padding: '24px', backgroundColor: '#191A23', color: '#FFF', borderRadius: '16px', border: '1px solid #333' }}>
+        {/* Side-by-Side Comparison Studio */}
+        <section className="container" style={{ marginBottom: 24 }}>
+          <div className="console-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ backgroundColor: '#B9FF66', color: '#000', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                    Measurable Engineering Proof
-                  </span>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#FFF' }}>
-                    Side-by-Side "Lost Response" Experiment
-                  </h3>
-                </div>
-                <p style={{ color: '#A0AEC0', fontSize: '0.88rem', maxWidth: '680px', margin: '4px 0 0' }}>
-                  Simulates a network drop after payment execution. Proves that retrying <strong>Without OnceGate</strong> creates <strong>2 duplicate charges</strong>, while retrying <strong>With OnceGate</strong> creates <strong>0 duplicate charges</strong>.
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 4px' }}>
+                  Side-by-Side Lost Response Experiment
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: '640px', margin: 0 }}>
+                  Simulates a network failure after database execution. Compares direct upstream retry vs OnceGate proxy handling.
                 </p>
               </div>
 
               <button
-                className="btn btn-lime"
+                className="btn btn-primary"
                 onClick={() => void runBeforeAfterDemo()}
                 disabled={compRunning}
-                style={{ padding: '12px 20px', fontSize: '0.9rem', fontWeight: 700 }}
               >
-                {compRunning ? 'Running Experiment...' : '⚡ Run Before / After Proof'}
+                {compRunning ? 'Running test...' : 'Run comparison test'}
               </button>
             </div>
 
-            {/* Experiment Results Comparison Display */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginTop: 20 }}>
-              {/* Box 1: Without OnceGate */}
-              <div style={{ backgroundColor: '#262838', padding: '18px', borderRadius: '12px', border: '1px solid #E53E3E' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ color: '#FC8181', fontWeight: 700, fontSize: '0.9rem' }}>❌ WITHOUT ONCEGATE (Direct Upstream)</span>
-                  <span style={{ fontSize: '0.75rem', backgroundColor: '#9B2C2C', color: '#FFF', padding: '2px 6px', borderRadius: '4px' }}>Unprotected Retry</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 20 }}>
+              {/* Direct Upstream */}
+              <div style={{ backgroundColor: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <div style={{ color: 'var(--accent-red)', fontWeight: 600, fontSize: '0.85rem', marginBottom: 6 }}>
+                  Direct Upstream (No Proxy)
                 </div>
-                <p style={{ fontSize: '0.82rem', color: '#CBD5E0', marginBottom: 12 }}>
-                  Client POST → Payment executed → Network Connection Drops → Client Retries.
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 12 }}>
+                  Request → DB Charge Inserted → Socket Dropped → Client Retries
                 </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 700, padding: '10px 12px', backgroundColor: '#1A202C', borderRadius: '8px', color: '#FC8181' }}>
-                  <span>Upstream Charges Executed:</span>
-                  <span>{compResult.directAfter !== undefined ? `${compResult.directAfter - compResult.directBefore} charges (DUPLICATE 💥)` : 'Run test to measure'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-red)' }}>
+                  <span>DB Charges Executed:</span>
+                  <span>{compResult.directAfter !== undefined ? `${compResult.directAfter - compResult.directBefore} (Duplicate side-effect)` : '—'}</span>
                 </div>
               </div>
 
-              {/* Box 2: With OnceGate */}
-              <div style={{ backgroundColor: '#262838', padding: '18px', borderRadius: '12px', border: '1px solid #B9FF66' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ color: '#B9FF66', fontWeight: 700, fontSize: '0.9rem' }}>✅ WITH ONCEGATE PROXY</span>
-                  <span style={{ fontSize: '0.75rem', backgroundColor: '#22543D', color: '#B9FF66', padding: '2px 6px', borderRadius: '4px' }}>Protected State Machine</span>
+              {/* OnceGate Proxy */}
+              <div style={{ backgroundColor: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(34,197,94,0.3)' }}>
+                <div style={{ color: 'var(--accent-green)', fontWeight: 600, fontSize: '0.85rem', marginBottom: 6 }}>
+                  OnceGate Idempotency Proxy
                 </div>
-                <p style={{ fontSize: '0.82rem', color: '#CBD5E0', marginBottom: 12 }}>
-                  Client POST → PostgreSQL Claim → Connection Drops → Retry Intercepted → Outcome UNKNOWN.
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 12 }}>
+                  Request → Postgres Claim → Socket Dropped → Retry Intercepted
                 </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 700, padding: '10px 12px', backgroundColor: '#1A202C', borderRadius: '8px', color: '#B9FF66' }}>
-                  <span>Upstream Charges Executed:</span>
-                  <span>{compResult.gateAfter !== undefined ? `${compResult.gateAfter - compResult.gateBefore} charge (PROTECTED 🛡️)` : 'Run test to measure'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-green)' }}>
+                  <span>DB Charges Executed:</span>
+                  <span>{compResult.gateAfter !== undefined ? `${compResult.gateAfter - compResult.gateBefore} (Deduplicated)` : '—'}</span>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* SECTION 2: Interactive Failure Lab & Chaos Studio */}
-        <section className="container" style={{ marginBottom: 30 }}>
-          <div className="console-panel" style={{ padding: '24px' }}>
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Interactive Failure Lab & Chaos Studio</h3>
-              <p style={{ color: '#666', fontSize: '0.9rem', marginTop: 2 }}>
-                Inject controlled distributed system failures to verify state machine semantics under network drops, process crashes, and payload mismatches:
-              </p>
-            </div>
+        {/* Test Scenarios Toolbar */}
+        <section className="container" style={{ marginBottom: 24 }}>
+          <div className="console-panel">
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 12 }}>
+              Test Scenarios
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 16 }}>
+              Dispatch test requests through the gateway to verify concurrency locking, timeout handling, and payload validation.
+            </p>
 
-            <div className="controls-flex" style={{ gap: 10, flexWrap: 'wrap' }}>
-              <button className="btn btn-secondary" onClick={() => void send('normal')} disabled={sending}>
-                ▶ Standard Request
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button className="btn" onClick={() => void send('normal')} disabled={sending}>
+                Standard Request
               </button>
-              <button className="btn btn-lime" onClick={() => void send('storm')} disabled={sending}>
-                💥 Concurrent Storm (25x)
+              <button className="btn" onClick={() => void send('storm')} disabled={sending}>
+                Concurrent Requests (25x)
               </button>
-              <button className="btn btn-secondary" onClick={() => void send('drop')} disabled={sending}>
-                🧪 Lost Response (Socket Drop)
+              <button className="btn" onClick={() => void send('drop')} disabled={sending}>
+                Lost Response (Socket Drop)
               </button>
-              <button className="btn btn-secondary" onClick={() => void send('mismatch')} disabled={sending}>
-                🔀 Payload Mismatch Retry (422)
+              <button className="btn" onClick={() => void send('mismatch')} disabled={sending}>
+                Payload Mismatch (422)
               </button>
-              <button className="btn btn-secondary" onClick={() => void send('slow')} disabled={sending}>
-                🐢 Upstream Timeout (15s)
+              <button className="btn" onClick={() => void send('slow')} disabled={sending}>
+                Upstream Timeout (15s)
               </button>
               <button className="btn btn-danger" onClick={() => void send('die')} disabled={sending}>
-                ⚡ Upstream Process Crash
+                Upstream Process Crash
               </button>
-              <button className="btn btn-secondary" onClick={() => void api.resetCharges().then(refresh)} disabled={sending}>
-                🧹 Reset PostgreSQL Storage
+              <button className="btn" onClick={() => void api.resetCharges().then(refresh)} disabled={sending}>
+                Clear DB Storage
               </button>
             </div>
 
-            <div className="status-bar-box" style={{ marginTop: 20 }}>
-              <span>
-                Upstream DB Rows (`demo.charges`): <span className="count-green">{chargeCount ?? '—'}</span>
-              </span>
-              {stats && (
-                <span>
-                  Prevented Duplicates: <span className="count-green">{stats.duplicates_prevented}</span>
-                </span>
-              )}
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-color)', display: 'flex', gap: 24, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <span>Upstream database rows (`demo.charges`): <strong style={{ color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>{chargeCount ?? '—'}</strong></span>
+              <span>Prevented duplicates: <strong style={{ color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>{stats?.duplicates_prevented ?? 0}</strong></span>
             </div>
           </div>
         </section>
 
-        {/* SECTION 3: Live Receipt Audit Feed */}
-        <section className="container" style={{ marginBottom: 60 }}>
+        {/* Receipts Feed */}
+        <section className="container">
           <div className="table-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Durable Receipt Audit Feed</h3>
-              <span style={{ fontSize: '0.8rem', color: '#666', fontFamily: 'JetBrains Mono' }}>
-                {receipts.length} stored receipts
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Durable Receipts</h3>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                {receipts.length} receipts
               </span>
             </div>
 
             {loading && !receipts.length ? (
-              <p style={{ padding: 20, color: '#666' }}>Loading receipts from database...</p>
+              <p style={{ padding: '16px 0', color: 'var(--text-muted)' }}>Loading receipts...</p>
             ) : receipts.length === 0 ? (
-              <p style={{ padding: 20, color: '#666' }}>No stored receipts. Dispatch a request above to generate idempotency claims.</p>
+              <p style={{ padding: '16px 0', color: 'var(--text-muted)' }}>No stored receipts. Send a request above to generate claims.</p>
             ) : (
               <table>
                 <thead>
                   <tr>
-                    <th>Idempotency Key</th>
+                    <th>Idempotency key</th>
                     <th>Status</th>
                     <th>Attempts</th>
-                    <th>Age</th>
-                    <th>Audit</th>
+                    <th>Created</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {receipts.map((r) => (
                     <tr key={r.id} onClick={() => void inspect(r)}>
-                      <td style={{ fontFamily: 'JetBrains Mono', fontWeight: 500 }}>{r.idempotency_key.slice(0, 28)}...</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{r.idempotency_key.slice(0, 32)}...</td>
                       <td>
                         <span className={statusClass(r.status)}>{r.status}</span>
                       </td>
                       <td>{r.attempt_count}</td>
                       <td>{timeAgo(r.created_at)}</td>
                       <td>
-                        <span style={{ textDecoration: 'underline', fontWeight: 600, fontSize: '0.85rem' }}>Inspect Trail →</span>
+                        <span style={{ color: 'var(--accent-green)', fontSize: '0.85rem' }}>Inspect →</span>
                       </td>
                     </tr>
                   ))}
@@ -469,7 +409,7 @@ export default function App() {
         </section>
       </main>
 
-      {/* Drawer Overlay for Receipt Inspection & AI Explainability */}
+      {/* Detail Drawer */}
       {selected && (
         <div className="drawer-overlay" onClick={() => { setSelected(undefined); setDetail(undefined); setExplanation(null); setResolveTarget(null); }} />
       )}
@@ -478,12 +418,12 @@ export default function App() {
         <aside className="drawer-panel">
           <div className="drawer-header">
             <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#666', fontWeight: 600 }}>Receipt Details</div>
-              <h2 style={{ marginTop: 6 }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>Receipt Details</div>
+              <h2>
                 <span className={statusClass(selected.status)}>{selected.status}</span>
               </h2>
-              <p style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: '#666', marginTop: 4, wordBreak: 'break-all' }}>
-                ID: {selected.id}
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4, wordBreak: 'break-all' }}>
+                {selected.id}
               </p>
             </div>
             <button className="close-btn" onClick={() => { setSelected(undefined); setDetail(undefined); setExplanation(null); setResolveTarget(null); }}>
@@ -493,71 +433,63 @@ export default function App() {
 
           {detail && (
             <>
-              <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: '0.88rem', marginBottom: 24 }}>
-                <dt style={{ color: '#666' }}>Idempotency Key</dt>
-                <dd style={{ fontFamily: 'JetBrains Mono', wordBreak: 'break-all' }}>{detail.idempotency_key}</dd>
-                {detail.method && <><dt style={{ color: '#666' }}>HTTP Method</dt><dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.method}</dd></>}
-                {detail.path && <><dt style={{ color: '#666' }}>Target Path</dt><dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.path}</dd></>}
-                <dt style={{ color: '#666' }}>Total Attempts</dt>
-                <dd style={{ fontFamily: 'JetBrains Mono' }}>{detail.attempt_count}</dd>
+              <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: '0.88rem', marginBottom: 20 }}>
+                <dt style={{ color: 'var(--text-muted)' }}>Idempotency key</dt>
+                <dd style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>{detail.idempotency_key}</dd>
+                {detail.method && <><dt style={{ color: 'var(--text-muted)' }}>Method</dt><dd style={{ fontFamily: 'var(--font-mono)' }}>{detail.method}</dd></>}
+                {detail.path && <><dt style={{ color: 'var(--text-muted)' }}>Path</dt><dd style={{ fontFamily: 'var(--font-mono)' }}>{detail.path}</dd></>}
+                <dt style={{ color: 'var(--text-muted)' }}>Attempts</dt>
+                <dd style={{ fontFamily: 'var(--font-mono)' }}>{detail.attempt_count}</dd>
               </dl>
 
-              {/* AI Explainability Assistant Button */}
-              <div style={{ marginBottom: 20, padding: '14px', backgroundColor: '#F7FAFC', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2D3748' }}>🤖 AI Diagnostic Assistant</span>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.75rem', padding: '4px 10px' }}
-                    onClick={() => void fetchExplanation(detail.id)}
-                  >
-                    Explain Outcome
-                  </button>
-                </div>
-                <p style={{ fontSize: '0.8rem', color: '#718096', margin: 0 }}>
-                  Generates an evidence-grounded diagnosis analyzing PostgreSQL audit events, retry count, and network timing.
-                </p>
+              {/* Diagnosis Button */}
+              <div style={{ marginBottom: 20 }}>
+                <button
+                  className="btn"
+                  style={{ width: '100%', fontSize: '0.85rem' }}
+                  onClick={() => void fetchExplanation(detail.id)}
+                >
+                  Analyze audit trail
+                </button>
               </div>
 
-              {/* AI Explanation Result Box */}
+              {/* Diagnosis Box */}
               {explanation && (
-                <div style={{ marginBottom: 24, padding: '16px', backgroundColor: '#191A23', color: '#E2E8F0', borderRadius: '12px', border: '1px solid #B9FF66', fontSize: '0.85rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: '#B9FF66', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                    <span>✓ Grounded Audit Diagnosis</span>
-                  </div>
-                  <p style={{ margin: '0 0 10px', lineHeight: 1.5 }}>{explanation.summary}</p>
-                  <div style={{ fontSize: '0.8rem', color: '#CBD5E0', backgroundColor: '#262838', padding: '10px', borderRadius: '6px' }}>
-                    <strong>Remediation:</strong> {explanation.remediation}
+                <div style={{ marginBottom: 24, padding: '14px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  <div style={{ color: 'var(--accent-green)', fontWeight: 600, marginBottom: 6 }}>Audit Analysis</div>
+                  <p style={{ margin: '0 0 8px', color: 'var(--text-main)', lineHeight: 1.5 }}>{explanation.summary}</p>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                    <strong>Action:</strong> {explanation.remediation}
                   </div>
                 </div>
               )}
 
               {/* Event Timeline */}
               <div className="timeline">
-                <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', color: '#666', marginBottom: 12, letterSpacing: '0.05em' }}>Event Audit Timeline</h4>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>Audit Log</div>
                 {detail.events.map((ev) => (
                   <div key={ev.id} className="timeline-event">
                     <div className="timeline-dot" />
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ev.kind.replace(/_/g, ' ')}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#666' }}>{new Date(ev.created_at).toLocaleTimeString()}</div>
+                      <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{ev.kind.replace(/_/g, ' ')}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(ev.created_at).toLocaleTimeString()}</div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Resolution for UNKNOWN State */}
+              {/* Manual Resolution for UNKNOWN */}
               {selected.status === 'UNKNOWN' && (
-                <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #DDD' }}>
-                  <h4 style={{ color: '#191A23', fontSize: '0.95rem', fontWeight: 700, marginBottom: 6 }}>Manual Resolution Required</h4>
-                  <p style={{ fontSize: '0.82rem', color: '#555', marginBottom: 12 }}>
+                <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-color)' }}>
+                  <div style={{ color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 600, marginBottom: 4 }}>Manual Resolution</div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 12 }}>
                     Verify upstream database status, then record audit resolution:
                   </p>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button className="btn btn-lime" style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }} onClick={() => setResolveTarget('COMMITTED')}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => setResolveTarget('COMMITTED')}>
                       Mark COMMITTED
                     </button>
-                    <button className="btn btn-danger" style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }} onClick={() => setResolveTarget('FAILED')}>
+                    <button className="btn btn-danger" style={{ flex: 1 }} onClick={() => setResolveTarget('FAILED')}>
                       Mark FAILED
                     </button>
                   </div>
@@ -568,26 +500,26 @@ export default function App() {
         </aside>
       )}
 
-      {/* Technical Boundaries Drawer Modal */}
+      {/* Limitations Modal */}
       {showLimits && (
         <div className="drawer-overlay" style={{ zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowLimits(false)}>
-          <div style={{ backgroundColor: '#FFF', borderRadius: '16px', padding: '28px', maxWidth: '600px', width: '90%', border: '2px solid #191A23', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 8, color: '#191A23' }}>
-              What OnceGate Cannot Know (Transparent Boundaries)
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '24px', maxWidth: '540px', width: '90%', border: '1px solid var(--border-color)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 12, color: 'var(--text-main)' }}>
+              Technical Boundaries & Limitations
             </h3>
-            <div style={{ fontSize: '0.88rem', color: '#4A5568', lineHeight: 1.6 }}>
-              <p>
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              <p style={{ marginBottom: 10 }}>
                 <strong>Network Ambiguity:</strong> If the gateway forwards a request to an upstream service and the connection drops before HTTP headers arrive, OnceGate cannot determine from outside whether the upstream executed the side-effect.
               </p>
-              <p>
-                <strong>Honest UNKNOWN State:</strong> Rather than guessing or auto-retrying (which risks double charging), OnceGate durably transitions the receipt to <code>UNKNOWN</code> and blocks further attempts until an operator inspects database logs and records an audited resolution.
+              <p style={{ marginBottom: 10 }}>
+                <strong>Honest UNKNOWN State:</strong> Rather than guessing or auto-retrying (which risks double execution), OnceGate transitions the receipt to <code>UNKNOWN</code> and blocks further attempts until an operator records an audited resolution.
               </p>
               <p>
                 <strong>Fail-Closed Consistency:</strong> If PostgreSQL loses connectivity, OnceGate returns <code>503 Service Unavailable</code> to prioritize correctness over availability.
               </p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
-              <button className="btn btn-secondary" onClick={() => setShowLimits(false)}>
+              <button className="btn" onClick={() => setShowLimits(false)}>
                 Close
               </button>
             </div>
@@ -595,37 +527,37 @@ export default function App() {
         </div>
       )}
 
-      {/* Custom In-App Modal for UNKNOWN Resolution */}
+      {/* Resolution Confirmation Modal */}
       {resolveTarget && (
         <div className="drawer-overlay" style={{ zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ backgroundColor: '#FFF', borderRadius: '16px', padding: '28px', maxWidth: '460px', width: '90%', border: '2px solid #191A23', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8, color: '#191A23' }}>
-              Confirm Audit Resolution → <span style={{ color: resolveTarget === 'COMMITTED' ? '#2E7D32' : '#C62828' }}>{resolveTarget}</span>
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '24px', maxWidth: '440px', width: '90%', border: '1px solid var(--border-color)' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-main)' }}>
+              Resolve to {resolveTarget}
             </h3>
-            <p style={{ fontSize: '0.88rem', color: '#555', marginBottom: 16 }}>
-              Provide a mandatory audit note documenting why this receipt is being marked as {resolveTarget}:
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+              Provide a mandatory audit note explaining why this receipt is being resolved:
             </p>
             <textarea
               value={resolutionNote}
               onChange={(e) => setResolutionNote(e.target.value)}
-              placeholder="e.g. Verified transaction #8821 in upstream PostgreSQL database logs."
+              placeholder="e.g. Verified charge in upstream PostgreSQL database logs."
               rows={3}
-              style={{ width: '100%', padding: '10px', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid #191A23', fontFamily: 'sans-serif', marginBottom: 18 }}
+              style={{ width: '100%', padding: '10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', fontFamily: 'var(--font-sans)', marginBottom: 16 }}
             />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
-                className="btn btn-secondary"
+                className="btn"
                 onClick={() => { setResolveTarget(null); setResolutionNote(''); }}
                 disabled={resolving}
               >
                 Cancel
               </button>
               <button
-                className={`btn ${resolveTarget === 'COMMITTED' ? 'btn-lime' : 'btn-danger'}`}
+                className={`btn ${resolveTarget === 'COMMITTED' ? 'btn-primary' : 'btn-danger'}`}
                 onClick={() => void confirmResolve()}
                 disabled={resolving}
               >
-                {resolving ? 'Recording...' : 'Submit Resolution'}
+                {resolving ? 'Saving...' : 'Submit Resolution'}
               </button>
             </div>
           </div>
@@ -634,17 +566,13 @@ export default function App() {
 
       {/* Footer */}
       <footer className="site-footer">
-        <div className="container">
-          <div className="footer-card" style={{ padding: '24px 32px' }}>
-            <div className="footer-bottom" style={{ paddingTop: 0, borderTop: 'none' }}>
-              <div>© 2026 OnceGate · Durable HTTP Idempotency Gateway</div>
-              <div><a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07" target="_blank" rel="noreferrer">IETF Draft Specification ↗</a></div>
-            </div>
-          </div>
+        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>© 2026 OnceGate · Durable HTTP Idempotency Gateway</div>
+          <div><a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07" target="_blank" rel="noreferrer">IETF Draft Specification ↗</a></div>
         </div>
       </footer>
 
-      {/* Toast Notification */}
+      {/* Toast */}
       {toast && <div className="toast-msg">{toast}</div>}
     </>
   );
