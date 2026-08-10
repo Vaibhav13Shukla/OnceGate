@@ -49,12 +49,10 @@ zerops:
         - npm ci
         - npm run build -w @oncegate/console
       deployFiles:
-        - apps/console/dist
-        - apps/console/package.json
-        - node_modules
+        - apps/console/dist/~
     run:
-      base: nodejs@20
-      ports:
-        - port: 80
-          httpSupport: true
-      start: npx vite preview --host 0.0.0.0 --port 80 --outDir apps/console/dist
+      base: static
+      routing:
+        redirects:
+          - from: /*
+            to: /index.html
