@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Database } from './db.js';
 import { problem } from './problem.js';
-import { addEvent, type Receipt } from './receipts.js';
+import { type Receipt } from './receipts.js';
 import { assertTransition, type ReceiptStatus } from './state.js';
 
 function adminOnly(app: FastifyInstance, token: string) {
@@ -34,6 +34,48 @@ export function registerControlRoutes(app: FastifyInstance, db: Database, adminT
     const events = await db.query('SELECT * FROM events WHERE receipt_id = $1 ORDER BY created_at ASC', [id]);
     return { ...receipt.rows[0], events: events.rows };
   });
+  control.get('/v1/receipts/:id/explain', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const receipt = await db.query<Receipt>('SELECT * FROM receipts WHERE id = $1', [id]);
+    if (!receipt.rowCount) return problem(reply, 404, 'receipt-not-found', 'Receipt not found', 'No receipt exists with this ID.');
+    const events = await db.query<{ kind: string; created_at: string; detail: any }>('SELECT * FROM events WHERE receipt_id = $1 ORDER BY created_at ASC', [id]);
+
+    const r = receipt.rows[0];
+    const evList = events.rows.map(e => e.kind).join(' → ');
+
+    let summary = '';
+    let remediation = '';
+    if (r.status === 'UNKNOWN') {
+      summary = `Receipt state is UNKNOWN. OnceGate forwarded the request to the upstream target (${r.path}), but the HTTP connection timed out or closed before response headers were delivered. The upstream side-effect may or may not have committed in PostgreSQL.`;
+      remediation = 'Verify the upstream database status manually, then resolve this receipt to COMMITTED or FAILED via the Ops Console with an audit note.';
+    } else if (r.status === 'COMMITTED') {
+      summary = `Receipt state is COMMITTED. Upstream returned HTTP ${r.upstream_status ?? 200}. The result is durably stored in PostgreSQL and will be replayed directly for identical idempotency keys.`;
+      remediation = 'No action required. Subsequent client retrying with this key will safely receive the replayed response without duplicate execution.';
+    } else if (r.status === 'PENDING') {
+      summary = 'Receipt state is PENDING. An upstream request is currently in flight or awaiting settlement.';
+      remediation = 'Wait for request completion or pending sweeper evaluation.';
+    } else {
+      summary = `Receipt state is FAILED (${r.upstream_status ?? '5xx'}). The upstream returned a deterministic failure status code.`;
+      remediation = 'Client may retry with a new or existing key depending on upstream error semantics.';
+    }
+
+    return {
+      receipt_id: r.id,
+      idempotency_key: r.idempotency_key,
+      status: r.status,
+      audit_events: evList,
+      summary,
+      remediation,
+      evidence: {
+        attempts: r.attempt_count,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        fingerprint: r.fingerprint,
+        upstream_status: r.upstream_status
+      },
+      deterministic_truth: true
+    };
+  });
   control.post('/v1/receipts/:id/resolve', async (request, reply) => {
     const { id } = request.params as { id: string };
     let body: { status?: ReceiptStatus; note?: string } | undefined;
@@ -41,7 +83,6 @@ export function registerControlRoutes(app: FastifyInstance, db: Database, adminT
     catch { return problem(reply, 400, 'invalid-resolution', 'Invalid resolution', 'Resolution body must be valid JSON.'); }
     if (!body || !['COMMITTED', 'FAILED'].includes(body.status ?? '') || !body.note?.trim()) return problem(reply, 400, 'invalid-resolution', 'Invalid resolution', 'status must be COMMITTED or FAILED and note must be non-empty.');
 
-    // BUG-02 fix: wrap SELECT FOR UPDATE + UPDATE + INSERT in a transaction
     const client = await db.connect();
     try {
       await client.query('BEGIN');

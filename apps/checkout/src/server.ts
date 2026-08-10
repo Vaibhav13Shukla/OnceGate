@@ -28,7 +28,7 @@ export function buildCheckoutApp(options: { databaseUrl?: string; db?: pg.Pool }
   app.get('/', async () => ({ name: 'OnceGate Checkout Demo API', status: 'online' }));
   app.get('/healthz', async () => ({ ok: true }));
 
-  app.post('/charge', async (request, reply) => {
+  const processCharge = async (request: any, reply: any) => {
     if (!dbUrl) return reply.code(500).send({ error: 'DATABASE_URL is missing in environment' });
     const chaos = request.headers['x-chaos'];
     const body = Buffer.isBuffer(request.body)
@@ -49,13 +49,26 @@ export function buildCheckoutApp(options: { databaseUrl?: string; db?: pg.Pool }
         'INSERT INTO demo.charges (amount,currency,card_last4) VALUES ($1,$2,$3) RETURNING id',
         [body.amount, body.currency, body.card_last4]
       );
-      if (chaos === 'die' && !process.env.VERCEL) process.exit(1);
+
+      if (chaos === 'die' && !process.env.VERCEL) {
+        process.exit(1);
+      }
+
+      if (chaos === 'drop') {
+        // Execute charge in DB, but drop raw TCP socket connection before sending HTTP response headers
+        request.raw.destroy();
+        return;
+      }
+
       return reply.code(201).send({ charge_id: charge.rows[0].id });
     } catch (err) {
       app.log.error(err, 'Failed to insert charge');
       return reply.code(500).send({ error: 'Database charge execution failed', message: err instanceof Error ? err.message : String(err) });
     }
-  });
+  };
+
+  app.post('/charge', processCharge);
+  app.post('/direct-charge', processCharge);
 
   app.get('/charges/count', async (_request, reply) => {
     try {
